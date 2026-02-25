@@ -24,6 +24,7 @@ import {
   PromptConstructorNodeData,
   LLMGenerateNodeData,
   GLBViewerNodeData,
+  SwitchNodeData,
 } from "@/types";
 
 /**
@@ -189,6 +190,37 @@ export function getConnectedInputsPure(
           if (routerInputs.easeCurve) easeCurve = routerInputs.easeCurve;
         }
         return; // Skip normal getSourceOutput processing for this edge
+      }
+
+      // Switch passthrough — traverse upstream if output is enabled
+      if (sourceNode.type === "switch") {
+        const switchData = sourceNode.data as SwitchNodeData;
+        const switchId = edge.sourceHandle; // Handle ID matches switch entry id
+        const switchEntry = switchData.switches?.find(s => s.id === switchId);
+
+        // Skip disabled outputs — data does not flow through disabled switches
+        if (!switchEntry || !switchEntry.enabled) {
+          return; // Block this path
+        }
+
+        // Enabled switch: recursively get upstream data (same pattern as router)
+        const switchInputs = getConnectedInputsPure(sourceNode.id, nodes, edges, _visited);
+        const edgeType = switchData.inputType;
+
+        if (edgeType === "image") {
+          images.push(...switchInputs.images);
+        } else if (edgeType === "text") {
+          if (switchInputs.text) text = switchInputs.text;
+        } else if (edgeType === "video") {
+          videos.push(...switchInputs.videos);
+        } else if (edgeType === "audio") {
+          audio.push(...switchInputs.audio);
+        } else if (edgeType === "3d") {
+          if (switchInputs.model3d) model3d = switchInputs.model3d;
+        } else if (edgeType === "easeCurve") {
+          if (switchInputs.easeCurve) easeCurve = switchInputs.easeCurve;
+        }
+        return; // Skip normal getSourceOutput processing
       }
 
       const handleId = edge.targetHandle;

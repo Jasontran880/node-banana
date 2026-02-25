@@ -78,6 +78,7 @@ import {
   executeVideoFrameGrab,
   executeGlbViewer,
   executeRouter,
+  executeSwitch,
 } from "./execution";
 import type { NodeExecutionContext } from "./execution";
 export type { LevelGroup } from "./utils/executionUtils";
@@ -1012,6 +1013,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           case "router":
             await executeRouter(executionCtx);
             break;
+          case "switch":
+            await executeSwitch(executionCtx);
+            break;
         }
     }; // End of executeSingleNode helper
 
@@ -1332,6 +1336,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           break;
         case "router":
           await executeRouter(executionCtx);
+          break;
+        case "switch":
+          await executeSwitch(executionCtx);
           break;
       }
     };

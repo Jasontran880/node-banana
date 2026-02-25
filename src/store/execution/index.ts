@@ -18,6 +18,7 @@ export {
   executeImageCompare,
   executeGlbViewer,
   executeRouter,
+  executeSwitch,
 } from "./simpleNodeExecutors";
 
 export { executeNanoBanana } from "./nanoBananaExecutor";
