@@ -387,12 +387,6 @@ function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         status: "idle",
         error: null,
       };
-    case "router":
-      return {};
-    case "switch":
-      return { inputType: null, switches: [{ id: "sw-1", name: "Output 1", enabled: true }] };
-    case "conditionalSwitch":
-      return { incomingText: null, rules: [{ id: "rule-1", value: "", mode: "contains", label: "Rule 1", isMatched: false }] };
     case "glbViewer":
       return {
         glbUrl: null,

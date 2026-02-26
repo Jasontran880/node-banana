@@ -1152,9 +1152,6 @@ export function WorkflowCanvas() {
             easeCurve: { width: 340, height: 480 },
             videoTrim: { width: 360, height: 360 },
             videoFrameGrab: { width: 320, height: 320 },
-            router: { width: 200, height: 80 },
-            switch: { width: 220, height: 120 },
-            conditionalSwitch: { width: 260, height: 180 },
             glbViewer: { width: 360, height: 380 },
           };
           const dims = defaultDimensions[nodeType];

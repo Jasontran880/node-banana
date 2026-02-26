@@ -1,5 +1,6 @@
 import {
   NodeType,
+  ModelType,
   ImageInputNodeData,
   AudioInputNodeData,
   AnnotationNodeData,
@@ -128,7 +129,7 @@ export const createDefaultNodeData = (type: NodeType): WorkflowNodeData => {
       if (nodeDefaults.generateImage?.selectedModel) {
         selectedModel = nodeDefaults.generateImage.selectedModel;
       } else {
-        const modelDisplayName = MODEL_DISPLAY_NAMES[legacyDefaults.model] || legacyDefaults.model;
+        const modelDisplayName = MODEL_DISPLAY_NAMES[legacyDefaults.model as ModelType] || legacyDefaults.model;
         selectedModel = {
           provider: "gemini",
           modelId: legacyDefaults.model,
