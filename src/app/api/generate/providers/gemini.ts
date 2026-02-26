@@ -14,6 +14,7 @@ import { GenerateResponse, ModelType } from "@/types";
 export const MODEL_MAP: Record<ModelType, string> = {
   "nano-banana": "gemini-2.5-flash-image",
   "nano-banana-pro": "gemini-3-pro-image-preview",
+  "nano-banana-2": "gemini-3.1-flash-image-preview",
 };
 
 /**
@@ -71,17 +72,17 @@ export async function generateWithGemini(
     };
   }
 
-  // Add resolution only for Nano Banana Pro
-  if (model === "nano-banana-pro" && resolution) {
+  // Add resolution for Nano Banana Pro and Nano Banana 2
+  if ((model === "nano-banana-pro" || model === "nano-banana-2") && resolution) {
     if (!config.imageConfig) {
       config.imageConfig = {};
     }
     (config.imageConfig as Record<string, unknown>).imageSize = resolution;
   }
 
-  // Add tools array for Google Search (only Nano Banana Pro)
+  // Add tools array for Google Search (Nano Banana Pro and Nano Banana 2)
   const tools = [];
-  if (model === "nano-banana-pro" && useGoogleSearch) {
+  if ((model === "nano-banana-pro" || model === "nano-banana-2") && useGoogleSearch) {
     tools.push({ googleSearch: {} });
   }
 
