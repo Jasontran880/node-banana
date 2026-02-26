@@ -536,8 +536,11 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       ) as WorkflowNode[],
       hasUnsavedChanges: true,
     }));
-    // Recompute dimming if this is a switch node and switches data changed
+    // Recompute dimming if this is a switch or conditionalSwitch node and their control data changed
     if (node?.type === "switch" && "switches" in data) {
+      get().recomputeDimmedNodes();
+    }
+    if (node?.type === "conditionalSwitch" && "rules" in data) {
       get().recomputeDimmedNodes();
     }
   },
