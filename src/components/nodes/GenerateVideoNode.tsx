@@ -25,7 +25,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   const commentNavigation = useCommentNavigation(id);
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, replicateEnabled, kieEnabled } = useProviderApiKeys();
+  const { geminiApiKey, replicateApiKey, falApiKey, kieApiKey, replicateEnabled, kieEnabled } = useProviderApiKeys();
   const generationsPath = useWorkflowStore((state) => state.generationsPath);
   const [externalModels, setExternalModels] = useState<ProviderModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -37,9 +37,13 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   // Get the current selected provider (default to fal since Gemini doesn't do video)
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "fal";
 
-  // Get enabled providers (exclude Gemini since it doesn't do video)
+  // Get enabled providers
   const enabledProviders = useMemo(() => {
     const providers: { id: ProviderType; name: string }[] = [];
+    // Gemini available when API key is configured (settings or env var)
+    if (geminiApiKey) {
+      providers.push({ id: "gemini", name: "Gemini" });
+    }
     // fal.ai is always available (works without key but rate limited)
     providers.push({ id: "fal", name: "fal.ai" });
     // Add Replicate if configured
@@ -51,7 +55,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       providers.push({ id: "kie", name: "Kie.ai" });
     }
     return providers;
-  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey]);
+  }, [geminiApiKey, replicateEnabled, replicateApiKey, kieEnabled, kieApiKey]);
 
   // Fetch models from external providers when provider changes
   const fetchModels = useCallback(async () => {
@@ -60,6 +64,9 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     try {
       const capabilities = VIDEO_CAPABILITIES.join(",");
       const headers: HeadersInit = {};
+      if (geminiApiKey) {
+        headers["X-Gemini-API-Key"] = geminiApiKey;
+      }
       if (replicateApiKey) {
         headers["X-Replicate-Key"] = replicateApiKey;
       }
@@ -91,7 +98,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     } finally {
       setIsLoadingModels(false);
     }
-  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey]);
+  }, [currentProvider, geminiApiKey, replicateApiKey, falApiKey, kieApiKey]);
 
   useEffect(() => {
     fetchModels();

@@ -2136,6 +2136,7 @@ export const useWorkflowStore = create<WorkflowStore>()(workflowStoreImpl);
 export function useProviderApiKeys() {
   return useWorkflowStore(
     useShallow((state) => ({
+      geminiApiKey: state.providerSettings.providers.gemini?.apiKey ?? null,
       replicateApiKey: state.providerSettings.providers.replicate?.apiKey ?? null,
       falApiKey: state.providerSettings.providers.fal?.apiKey ?? null,
       kieApiKey: state.providerSettings.providers.kie?.apiKey ?? null,
