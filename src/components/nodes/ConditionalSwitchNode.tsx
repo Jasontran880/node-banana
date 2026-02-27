@@ -229,7 +229,7 @@ export const ConditionalSwitchNode = memo(({ id, data, selected }: NodeProps<Wor
       selected={selected}
       minWidth={260}
       minHeight={minHeight}
-      className="bg-teal-950/50 border-teal-600"
+      className="bg-teal-950/80 border-teal-600"
     >
       {/* Input handle (left) - text only, aligned with header */}
       <Handle
