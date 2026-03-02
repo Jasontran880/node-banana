@@ -2060,9 +2060,14 @@ export function WorkflowCanvas() {
             // Groups don't get floating headers
             if (node.type === "group") return null;
 
-            const nodeWidth = typeof node.style?.width === "number"
-              ? node.style.width
-              : (defaultNodeDimensions[node.type as NodeType]?.width ?? 250);
+            const styleW = node.style?.width;
+            const nodeWidth =
+              typeof styleW === "number" ? styleW
+              : typeof styleW === "string" ? parseFloat(styleW) || 0
+              : 0;
+            const measuredWidth = (node.measured?.width) || 0;
+            const defaultWidth = defaultNodeDimensions[node.type as NodeType]?.width ?? 250;
+            const headerWidth = nodeWidth || measuredWidth || defaultWidth;
 
             return (
               <FloatingNodeHeader
@@ -2071,7 +2076,7 @@ export function WorkflowCanvas() {
                 type={node.type as NodeType}
                 data={node.data}
                 position={node.position}
-                width={nodeWidth}
+                width={headerWidth}
                 selected={!!node.selected}
                 title={getNodeTitle(node)}
                 customTitle={node.data?.customTitle}
