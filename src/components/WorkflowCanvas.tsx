@@ -66,6 +66,11 @@ import { ProjectSetupModal } from "./ProjectSetupModal";
 import { ChatPanel } from "./ChatPanel";
 import { EditOperation } from "@/lib/chat/editOperations";
 import { stripBinaryData } from "@/lib/chat/contextBuilder";
+import { PromptEditorModal } from "./modals/PromptEditorModal";
+import { AnnotationModal } from "./AnnotationModal";
+import { SplitGridSettingsModal } from "./SplitGridSettingsModal";
+import { createPortal } from "react-dom";
+import { useAnnotationStore } from "@/store/annotationStore";
 
 const nodeTypes: NodeTypes = {
   imageInput: ImageInputNode,
@@ -260,8 +265,9 @@ const findScrollableAncestor = (target: HTMLElement, deltaX: number, deltaY: num
 };
 
 export function WorkflowCanvas() {
-  const { nodes, edges, groups, onNodesChange, onEdgesChange, onConnect, addNode, updateNodeData, loadWorkflow, getNodeById, addToGlobalHistory, setNodeGroupId, executeWorkflow, isModalOpen, showQuickstart, setShowQuickstart, navigationTarget, setNavigationTarget, captureSnapshot, applyEditOperations, setWorkflowMetadata, canvasNavigationSettings, setShortcutsDialogOpen, dimmedNodeIds } =
+  const { nodes, edges, groups, onNodesChange, onEdgesChange, onConnect, addNode, updateNodeData, loadWorkflow, getNodeById, addToGlobalHistory, setNodeGroupId, executeWorkflow, isModalOpen, showQuickstart, setShowQuickstart, navigationTarget, setNavigationTarget, captureSnapshot, applyEditOperations, setWorkflowMetadata, canvasNavigationSettings, setShortcutsDialogOpen, dimmedNodeIds, regenerateNode } =
     useWorkflowStore();
+  const openAnnotationModal = useAnnotationStore((state) => state.openModal);
   const { screenToFlowPosition, getViewport, zoomIn, zoomOut, setViewport, setCenter } = useReactFlow();
   const { show: showToast } = useToast();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -271,6 +277,7 @@ export function WorkflowCanvas() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isBuildingWorkflow, setIsBuildingWorkflow] = useState(false);
   const [showNewProjectSetup, setShowNewProjectSetup] = useState(false);
+  const [expandingNode, setExpandingNode] = useState<{ id: string; type: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   // Detect if canvas is empty for showing quickstart
@@ -376,6 +383,35 @@ export function WorkflowCanvas() {
   const handleCommentChange = useCallback((nodeId: string, comment: string) => {
     updateNodeData(nodeId, { comment: comment || undefined });
   }, [updateNodeData]);
+
+  // Create onRun callback for runnable nodes
+  const getOnRun = useCallback((nodeId: string, nodeType: string) => {
+    const runnableTypes = ['nanoBanana', 'generateVideo', 'generate3d', 'generateAudio', 'llmGenerate'];
+    if (runnableTypes.includes(nodeType)) {
+      return () => regenerateNode(nodeId);
+    }
+    return undefined;
+  }, [regenerateNode]);
+
+  // Create onExpand callback for expandable nodes
+  const getOnExpand = useCallback((nodeId: string, nodeType: string) => {
+    if (nodeType === 'annotation') {
+      // Annotation uses annotationStore's openModal
+      return () => {
+        const node = getNodeById(nodeId);
+        if (!node) return;
+        const imageToEdit = node.data?.outputImage || node.data?.image;
+        if (!imageToEdit) return;
+        openAnnotationModal(nodeId, imageToEdit, node.data?.annotations);
+      };
+    }
+
+    const expandableTypes = ['prompt', 'promptConstructor', 'splitGrid'];
+    if (expandableTypes.includes(nodeType)) {
+      return () => setExpandingNode({ id: nodeId, type: nodeType });
+    }
+    return undefined;
+  }, [getNodeById, openAnnotationModal]);
 
 
   // Check if a node was dropped into a group and add it to that group
@@ -2043,6 +2079,8 @@ export function WorkflowCanvas() {
                 titlePrefix={getNodeTitlePrefix(node)}
                 onCustomTitleChange={(title) => handleCustomTitleChange(node.id, title)}
                 onCommentChange={(comment) => handleCommentChange(node.id, comment)}
+                onRun={getOnRun(node.id, node.type as string)}
+                onExpand={getOnExpand(node.id, node.type as string)}
               />
             );
           })}
@@ -2084,6 +2122,56 @@ export function WorkflowCanvas() {
 
       {/* Control panel - renders on right side when a configurable node is selected */}
       <ControlPanel />
+
+      {/* Expansion modals - rendered via portal when expand button is clicked */}
+      {expandingNode && expandingNode.type === 'prompt' && (() => {
+        const node = getNodeById(expandingNode.id);
+        if (!node) return null;
+        return createPortal(
+          <PromptEditorModal
+            isOpen={true}
+            initialPrompt={node.data?.prompt || ''}
+            onSubmit={(prompt) => {
+              updateNodeData(expandingNode.id, { prompt });
+              setExpandingNode(null);
+            }}
+            onClose={() => setExpandingNode(null)}
+          />,
+          document.body
+        );
+      })()}
+
+      {expandingNode && expandingNode.type === 'promptConstructor' && (() => {
+        const node = getNodeById(expandingNode.id);
+        if (!node) return null;
+        return createPortal(
+          <PromptEditorModal
+            isOpen={true}
+            initialPrompt={node.data?.template || ''}
+            onSubmit={(template) => {
+              updateNodeData(expandingNode.id, { template });
+              setExpandingNode(null);
+            }}
+            onClose={() => setExpandingNode(null)}
+          />,
+          document.body
+        );
+      })()}
+
+      {expandingNode && expandingNode.type === 'splitGrid' && (() => {
+        const node = getNodeById(expandingNode.id);
+        if (!node) return null;
+        return (
+          <SplitGridSettingsModal
+            nodeId={expandingNode.id}
+            nodeData={node.data}
+            onClose={() => setExpandingNode(null)}
+          />
+        );
+      })()}
+
+      {/* AnnotationModal is globally managed by annotationStore */}
+      <AnnotationModal />
     </div>
   );
 }
