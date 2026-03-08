@@ -13,6 +13,8 @@ import { useToast } from "@/components/Toast";
 import { getImageDimensions, calculateNodeSizePreservingHeight } from "@/utils/nodeDimensions";
 import { ProviderBadge } from "./ProviderBadge";
 import { getModelPageUrl, getProviderDisplayName } from "@/utils/providerUrls";
+import { useInlineParameters } from "@/hooks/useInlineParameters";
+import { InlineParameterPanel } from "./InlineParameterPanel";
 
 // Base 10 aspect ratios (all Gemini image models)
 const BASE_ASPECT_RATIOS: AspectRatio[] = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
@@ -47,6 +49,10 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
   const [isBrowseDialogOpen, setIsBrowseDialogOpen] = useState(false);
+
+  // Inline parameters infrastructure
+  const { inlineParametersEnabled } = useInlineParameters();
+  const parameterPanelRef = useRef<HTMLDivElement>(null);
 
   // Get the current selected provider (default to gemini)
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "gemini";
@@ -141,6 +147,16 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
   useEffect(() => {
     fetchModels();
   }, [fetchModels]);
+
+  // Inline parameters: compute collapse state and toggle handler
+  const isParamsExpanded = nodeData.parametersExpanded ?? true; // default expanded
+
+  const handleToggleParams = useCallback(() => {
+    const nodes = useWorkflowStore.getState().nodes;
+    const node = nodes.find(n => n.id === id);
+    const currentExpanded = (node?.data as NanoBananaNodeData)?.parametersExpanded ?? true;
+    updateNodeData(id, { parametersExpanded: !currentExpanded });
+  }, [id, updateNodeData]);
 
   // Handle provider change
   const handleProviderChange = useCallback(
@@ -479,6 +495,39 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     });
   }, [id, nodeData.outputImage, setNodes]);
 
+  // Node height management for inline parameters
+  useEffect(() => {
+    if (!inlineParametersEnabled) return;
+
+    // Use RAF to wait for render
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === id);
+        if (!currentNode) return;
+
+        const baseHeight = typeof currentNode.style?.height === 'number'
+          ? currentNode.style.height
+          : 300;
+
+        let paramHeight = 0;
+        if (isParamsExpanded && parameterPanelRef.current) {
+          // Measure the actual rendered height of parameters
+          const panelContent = parameterPanelRef.current.querySelector('#params-' + id);
+          if (panelContent) {
+            paramHeight = (panelContent as HTMLElement).scrollHeight;
+          }
+        }
+        // Add chevron button height (~28px)
+        const chevronHeight = 28;
+        const totalHeight = baseHeight + chevronHeight + paramHeight;
+
+        setNodes(nodes => nodes.map(n =>
+          n.id === id ? { ...n, style: { ...n.style, height: totalHeight } } : n
+        ));
+      });
+    });
+  }, [id, isParamsExpanded, inlineParametersEnabled, setNodes]);
+
   return (
     <>
     <BaseNode
@@ -701,7 +750,136 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
           </div>
         )}
       </div>
+
+      {/* Inline parameter panel */}
+      {inlineParametersEnabled && (
+        <InlineParameterPanel
+          expanded={isParamsExpanded}
+          onToggle={handleToggleParams}
+          nodeId={id}
+        >
+          {/* Model selector: Browse button + current model display */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-neutral-200 truncate">
+                {displayTitle}
+              </div>
+              <div className="text-[9px] text-neutral-500">
+                {enabledProviders.find(p => p.id === currentProvider)?.name || currentProvider}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsBrowseDialogOpen(true)}
+              className="nodrag nopan shrink-0 px-2 py-1 text-[10px] bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 rounded text-neutral-300 transition-colors"
+            >
+              Browse
+            </button>
+          </div>
+
+          {/* Gemini-specific controls - unified styling to match ModelParameters */}
+          {isGeminiProvider && currentModelId && (
+            <div className="space-y-1.5">
+              {/* Model selector */}
+              <div className="flex flex-col gap-0.5">
+                <label className="text-[9px] text-neutral-400 uppercase tracking-wide">Model</label>
+                <select
+                  value={currentModelId}
+                  onChange={handleModelChange}
+                  className="nodrag nopan w-full text-[10px] py-0.5 px-1.5 bg-neutral-800/50 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-neutral-600 text-neutral-300"
+                >
+                  {GEMINI_IMAGE_MODELS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Aspect Ratio */}
+              <div className="flex flex-col gap-0.5">
+                <label className="text-[9px] text-neutral-400 uppercase tracking-wide">Aspect Ratio</label>
+                <select
+                  value={nodeData.aspectRatio || "1:1"}
+                  onChange={handleAspectRatioChange}
+                  className="nodrag nopan w-full text-[10px] py-0.5 px-1.5 bg-neutral-800/50 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-neutral-600 text-neutral-300"
+                >
+                  {aspectRatios.map((ratio) => (
+                    <option key={ratio} value={ratio}>
+                      {ratio}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Resolution (if supported) */}
+              {supportsResolution && (
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] text-neutral-400 uppercase tracking-wide">Resolution</label>
+                  <select
+                    value={nodeData.resolution || "2K"}
+                    onChange={handleResolutionChange}
+                    className="nodrag nopan w-full text-[10px] py-0.5 px-1.5 bg-neutral-800/50 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-neutral-600 text-neutral-300"
+                  >
+                    {resolutions.map((res) => (
+                      <option key={res} value={res}>
+                        {res}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Google Search toggle */}
+              {(currentModelId === "nano-banana-pro" || currentModelId === "nano-banana-2") && (
+                <label className="flex items-center gap-1.5 text-[10px] text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={nodeData.useGoogleSearch || false}
+                    onChange={handleGoogleSearchToggle}
+                    className="nodrag nopan w-3 h-3 rounded border-neutral-700 bg-neutral-800/50 text-neutral-600 focus:ring-1 focus:ring-neutral-600 focus:ring-offset-0"
+                  />
+                  Google Search
+                </label>
+              )}
+
+              {/* Image Search toggle (NB2 only) */}
+              {currentModelId === "nano-banana-2" && (
+                <label className="flex items-center gap-1.5 text-[10px] text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={nodeData.useImageSearch || false}
+                    onChange={handleImageSearchToggle}
+                    className="nodrag nopan w-3 h-3 rounded border-neutral-700 bg-neutral-800/50 text-neutral-600 focus:ring-1 focus:ring-neutral-600 focus:ring-offset-0"
+                  />
+                  Image Search
+                </label>
+              )}
+            </div>
+          )}
+
+          {/* External provider parameters - reuse ModelParameters component */}
+          {!isGeminiProvider && nodeData.selectedModel?.modelId && (
+            <ModelParameters
+              modelId={nodeData.selectedModel.modelId}
+              provider={currentProvider}
+              parameters={nodeData.parameters || {}}
+              onParametersChange={handleParametersChange}
+              onInputsLoaded={handleInputsLoaded}
+            />
+          )}
+        </InlineParameterPanel>
+      )}
     </BaseNode>
+
+    {/* Model browse dialog */}
+    {isBrowseDialogOpen && (
+      <ModelSearchDialog
+        isOpen={isBrowseDialogOpen}
+        onClose={() => setIsBrowseDialogOpen(false)}
+        onModelSelected={handleBrowseModelSelect}
+        capabilities={IMAGE_CAPABILITIES}
+      />
+    )}
     </>
   );
 }

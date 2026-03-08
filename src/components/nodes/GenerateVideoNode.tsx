@@ -14,6 +14,8 @@ import { getVideoDimensions, calculateNodeSizePreservingHeight } from "@/utils/n
 import { ProviderBadge } from "./ProviderBadge";
 import { useVideoBlobUrl } from "@/hooks/useVideoBlobUrl";
 import { getModelPageUrl, getProviderDisplayName } from "@/utils/providerUrls";
+import { useInlineParameters } from "@/hooks/useInlineParameters";
+import { InlineParameterPanel } from "./InlineParameterPanel";
 
 // Video generation capabilities
 const VIDEO_CAPABILITIES: ModelCapability[] = ["text-to-video", "image-to-video"];
@@ -52,6 +54,10 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   const [isBrowseDialogOpen, setIsBrowseDialogOpen] = useState(false);
   const [isLoadingCarouselVideo, setIsLoadingCarouselVideo] = useState(false);
   const videoBlobUrl = useVideoBlobUrl(nodeData.outputVideo ?? null);
+
+  // Inline parameters infrastructure
+  const { inlineParametersEnabled } = useInlineParameters();
+  const parameterPanelRef = useRef<HTMLDivElement>(null);
 
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "fal";
 
@@ -121,6 +127,16 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   useEffect(() => {
     fetchModels();
   }, [fetchModels]);
+
+  // Inline parameters: compute collapse state and toggle handler
+  const isParamsExpanded = nodeData.parametersExpanded ?? true; // default expanded
+
+  const handleToggleParams = useCallback(() => {
+    const nodes = useWorkflowStore.getState().nodes;
+    const node = nodes.find(n => n.id === id);
+    const currentExpanded = (node?.data as GenerateVideoNodeData)?.parametersExpanded ?? true;
+    updateNodeData(id, { parametersExpanded: !currentExpanded });
+  }, [id, updateNodeData]);
 
   // Handle provider change
   const handleProviderChange = useCallback(
@@ -386,6 +402,39 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       });
     });
   }, [id, nodeData.outputVideo, setNodes]);
+
+  // Node height management for inline parameters
+  useEffect(() => {
+    if (!inlineParametersEnabled) return;
+
+    // Use RAF to wait for render
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === id);
+        if (!currentNode) return;
+
+        const baseHeight = typeof currentNode.style?.height === 'number'
+          ? currentNode.style.height
+          : 300;
+
+        let paramHeight = 0;
+        if (isParamsExpanded && parameterPanelRef.current) {
+          // Measure the actual rendered height of parameters
+          const panelContent = parameterPanelRef.current.querySelector('#params-' + id);
+          if (panelContent) {
+            paramHeight = (panelContent as HTMLElement).scrollHeight;
+          }
+        }
+        // Add chevron button height (~28px)
+        const chevronHeight = 28;
+        const totalHeight = baseHeight + chevronHeight + paramHeight;
+
+        setNodes(nodes => nodes.map(n =>
+          n.id === id ? { ...n, style: { ...n.style, height: totalHeight } } : n
+        ));
+      });
+    });
+  }, [id, isParamsExpanded, inlineParametersEnabled, setNodes]);
 
   return (
     <>
@@ -764,10 +813,48 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
           </div>
         )}
       </div>
+
+      {/* Inline parameter panel */}
+      {inlineParametersEnabled && (
+        <InlineParameterPanel
+          expanded={isParamsExpanded}
+          onToggle={handleToggleParams}
+          nodeId={id}
+        >
+          {/* Model selector: Browse button + current model display */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-neutral-200 truncate">
+                {displayTitle}
+              </div>
+              <div className="text-[9px] text-neutral-500">
+                {enabledProviders.find(p => p.id === currentProvider)?.name || currentProvider}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsBrowseDialogOpen(true)}
+              className="nodrag nopan shrink-0 px-2 py-1 text-[10px] bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 rounded text-neutral-300 transition-colors"
+            >
+              Browse
+            </button>
+          </div>
+
+          {/* External provider parameters - reuse ModelParameters component */}
+          {nodeData.selectedModel?.modelId && !isVeoModel(nodeData.selectedModel.modelId) && (
+            <ModelParameters
+              modelId={nodeData.selectedModel.modelId}
+              provider={currentProvider}
+              parameters={nodeData.parameters || {}}
+              onParametersChange={handleParametersChange}
+              onInputsLoaded={handleInputsLoaded}
+            />
+          )}
+        </InlineParameterPanel>
+      )}
     </BaseNode>
 
-    {/* Hidden ModelParameters — only for schema-loading side effect (dynamic handles) */}
-    {nodeData.selectedModel?.modelId && !isVeoModel(nodeData.selectedModel.modelId) && (
+    {/* Hidden ModelParameters — only for schema-loading side effect (dynamic handles) when inline disabled */}
+    {!inlineParametersEnabled && nodeData.selectedModel?.modelId && !isVeoModel(nodeData.selectedModel.modelId) && (
       <div className="hidden">
         <ModelParameters
           modelId={nodeData.selectedModel.modelId}
