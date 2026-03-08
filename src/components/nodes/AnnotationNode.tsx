@@ -126,7 +126,7 @@ export function AnnotationNode({ id, data, selected }: NodeProps<AnnotationNodeT
           <img
             src={displayImage}
             alt="Annotated"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
           />
           <button
             onClick={(e) => {

@@ -307,15 +307,6 @@ describe("GenerateVideoNode", () => {
       expect(screen.getByText("Run to generate")).toBeInTheDocument();
     });
 
-    it("should render empty state placeholder when no output video", () => {
-      render(
-        <TestWrapper>
-          <GenerateVideoNode {...createNodeProps({ status: "idle", outputVideo: null })} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText("Run to generate")).toBeInTheDocument();
-    });
   });
 
   describe("Loading State", () => {

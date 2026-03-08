@@ -237,15 +237,6 @@ describe("GenerateImageNode", () => {
       expect(screen.getByText("Run to generate")).toBeInTheDocument();
     });
 
-    it("should render empty state placeholder when no output image", () => {
-      render(
-        <TestWrapper>
-          <GenerateImageNode {...createNodeProps({ status: "idle", outputImage: null })} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText("Run to generate")).toBeInTheDocument();
-    });
   });
 
   describe("Loading State", () => {
