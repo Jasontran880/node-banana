@@ -536,6 +536,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
       fullBleed
+      settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputImage}
     >
       {/* Input handles - ALWAYS use same IDs and positions for connection stability */}

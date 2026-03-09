@@ -125,6 +125,7 @@ export function LLMGenerateNode({ id, data, selected }: NodeProps<LLMGenerateNod
       hasError={nodeData.status === "error"}
       isExecuting={isRunning}
       fullBleed
+      settingsExpanded={inlineParametersEnabled && isParamsExpanded}
     >
       {/* Image input - optional */}
       <Handle

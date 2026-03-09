@@ -232,6 +232,7 @@ export function GenerateAudioNode({ id, data, selected }: NodeProps<GenerateAudi
       <BaseNode
         id={id}
         selected={selected}
+        settingsExpanded={inlineParametersEnabled && isParamsExpanded}
         isExecuting={isRunning}
         hasError={nodeData.status === "error"}
         minWidth={300}

@@ -121,6 +121,7 @@ export function Generate3DNode({ id, data, selected }: NodeProps<Generate3DNodeT
     <BaseNode
       id={id}
       selected={selected}
+      settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
     >

@@ -21,6 +21,8 @@ interface BaseNodeProps {
   fullBleed?: boolean;
   /** Media URL (image/video) to use for aspect-fit resize on resize-handle double-click */
   aspectFitMedia?: string | null;
+  /** When true, bottom corners lose rounding so the selection ring connects to the settings panel below */
+  settingsExpanded?: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ export function BaseNode({
   minHeight = 100,
   fullBleed = false,
   aspectFitMedia,
+  settingsExpanded = false,
 }: BaseNodeProps) {
   const currentNodeIds = useWorkflowStore((state) => state.currentNodeIds);
   const setHoveredNodeId = useWorkflowStore((state) => state.setHoveredNodeId);
@@ -127,7 +130,7 @@ export function BaseNode({
       <div
         className={`
           h-full w-full flex flex-col overflow-visible
-          ${fullBleed ? "rounded-lg bg-neutral-800/50 border border-neutral-700/40" : "bg-neutral-800 rounded-lg shadow-lg border"}
+          ${fullBleed ? `${settingsExpanded && selected ? "rounded-t-lg" : "rounded-lg"} bg-neutral-800/50 border border-neutral-700/40` : "bg-neutral-800 rounded-lg shadow-lg border"}
           ${fullBleed ? "" : (isCurrentlyExecuting || isExecuting ? "border-blue-500 ring-1 ring-blue-500/20" : "border-neutral-700/60")}
           ${fullBleed ? "" : (hasError ? "border-red-500" : "")}
           ${fullBleed && selected ? "ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
