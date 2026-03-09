@@ -25,7 +25,7 @@ export function InlineParameterPanel({
       <button
         type="button"
         onClick={onToggle}
-        className="nodrag nopan w-full flex items-center justify-center gap-1 py-1 text-neutral-500 hover:text-neutral-300 transition-colors"
+        className={`nodrag nopan w-full flex items-center justify-center gap-1 py-1 text-neutral-500 hover:text-neutral-300 transition-colors ${expanded ? "bg-[#1a1a1a]" : ""}`}
         aria-label={expanded ? "Collapse parameters" : "Expand parameters"}
         aria-expanded={expanded}
         aria-controls={`params-${nodeId}`}
