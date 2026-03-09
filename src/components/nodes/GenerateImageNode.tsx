@@ -757,6 +757,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
           expanded={isParamsExpanded}
           onToggle={handleToggleParams}
           nodeId={id}
+          selected={selected}
         >
           {/* Gemini-specific controls */}
           {isGeminiProvider && currentModelId && (

@@ -820,6 +820,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
           expanded={isParamsExpanded}
           onToggle={handleToggleParams}
           nodeId={id}
+          selected={selected}
         >
           {/* External provider parameters - reuse ModelParameters component */}
           {nodeData.selectedModel?.modelId && !isVeoModel(nodeData.selectedModel.modelId) && (

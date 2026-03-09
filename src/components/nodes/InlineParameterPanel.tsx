@@ -7,6 +7,7 @@ interface InlineParameterPanelProps {
   onToggle: () => void;
   children: ReactNode;
   nodeId: string;
+  selected?: boolean;
 }
 
 /**
@@ -18,9 +19,16 @@ export function InlineParameterPanel({
   onToggle,
   children,
   nodeId,
+  selected = false,
 }: InlineParameterPanelProps) {
+  // When expanded + selected, overlap with BaseNode ring using negative margin
+  // so the two rings merge into one continuous outline
+  const ringClass = expanded && selected
+    ? "ring-2 ring-blue-500/40 rounded-b-lg -mt-[3px] pt-[3px]"
+    : "";
+
   return (
-    <div className="w-full">
+    <div className={`w-full ${ringClass}`}>
       {/* Settings toggle button — no background when collapsed, floats below node edge */}
       <button
         type="button"
