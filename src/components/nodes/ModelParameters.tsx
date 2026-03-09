@@ -227,7 +227,7 @@ export function ModelParameters({
         <div
           ref={gridRef}
           className={useGrid
-            ? "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] max-w-[640px] mx-auto gap-x-6 gap-y-1.5"
+            ? "grid grid-cols-[repeat(auto-fill,minmax(min(180px,100%),1fr))] max-w-[640px] mx-auto gap-x-6 gap-y-1.5"
             : "space-y-1.5 max-w-[280px]"
           }
         >
