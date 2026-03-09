@@ -2004,6 +2004,8 @@ export function WorkflowCanvas() {
         <MiniMap
           className="bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg"
           maskColor="rgba(0, 0, 0, 0.6)"
+          pannable
+          zoomable
           nodeColor={(node) => {
             switch (node.type) {
               case "imageInput":
