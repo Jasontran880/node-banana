@@ -446,6 +446,25 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       fullBleed
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputVideo}
+      settingsPanel={inlineParametersEnabled ? (
+        <InlineParameterPanel
+          expanded={isParamsExpanded}
+          onToggle={handleToggleParams}
+          nodeId={id}
+          selected={selected}
+        >
+          {/* External provider parameters - reuse ModelParameters component */}
+          {nodeData.selectedModel?.modelId && !isVeoModel(nodeData.selectedModel.modelId) && (
+            <ModelParameters
+              modelId={nodeData.selectedModel.modelId}
+              provider={currentProvider}
+              parameters={nodeData.parameters || {}}
+              onParametersChange={handleParametersChange}
+              onInputsLoaded={handleInputsLoaded}
+            />
+          )}
+        </InlineParameterPanel>
+      ) : undefined}
     >
       {/* Dynamic input handles based on model schema */}
       {nodeData.inputSchema && nodeData.inputSchema.length > 0 ? (
@@ -660,7 +679,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
         Video
       </div>
 
-      <div className={`relative w-full h-full min-h-0 overflow-hidden ${inlineParametersEnabled && isParamsExpanded ? "rounded-t-lg" : "rounded-lg"}`}>
+      <div className="relative w-full h-full min-h-0 overflow-hidden rounded-lg">
         {/* Preview area */}
         {nodeData.outputVideo ? (
           <>
@@ -815,26 +834,6 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
         )}
       </div>
 
-      {/* Inline parameter panel */}
-      {inlineParametersEnabled && (
-        <InlineParameterPanel
-          expanded={isParamsExpanded}
-          onToggle={handleToggleParams}
-          nodeId={id}
-          selected={selected}
-        >
-          {/* External provider parameters - reuse ModelParameters component */}
-          {nodeData.selectedModel?.modelId && !isVeoModel(nodeData.selectedModel.modelId) && (
-            <ModelParameters
-              modelId={nodeData.selectedModel.modelId}
-              provider={currentProvider}
-              parameters={nodeData.parameters || {}}
-              onParametersChange={handleParametersChange}
-              onInputsLoaded={handleInputsLoaded}
-            />
-          )}
-        </InlineParameterPanel>
-      )}
     </BaseNode>
 
     {/* Hidden ModelParameters — only for schema-loading side effect (dynamic handles) when inline disabled */}

@@ -124,6 +124,43 @@ export function Generate3DNode({ id, data, selected }: NodeProps<Generate3DNodeT
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
+      settingsPanel={inlineParametersEnabled ? (
+        <InlineParameterPanel
+          expanded={isParamsExpanded}
+          onToggle={handleToggleParams}
+          nodeId={id}
+          selected={selected}
+        >
+          {/* Model selector: Browse button + current model display */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-neutral-200 truncate">
+                {displayTitle}
+              </div>
+              <div className="text-[9px] text-neutral-500">
+                {currentProvider}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsBrowseDialogOpen(true)}
+              className="nodrag nopan shrink-0 px-2 py-1 text-[10px] bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 rounded text-neutral-300 transition-colors"
+            >
+              Browse
+            </button>
+          </div>
+
+          {/* External provider parameters - reuse ModelParameters component */}
+          {nodeData.selectedModel?.modelId && (
+            <ModelParameters
+              modelId={nodeData.selectedModel.modelId}
+              provider={currentProvider}
+              parameters={nodeData.parameters || {}}
+              onParametersChange={handleParametersChange}
+              onInputsLoaded={handleInputsLoaded}
+            />
+          )}
+        </InlineParameterPanel>
+      ) : undefined}
     >
       {/* Dynamic input handles based on model schema */}
       {nodeData.inputSchema && nodeData.inputSchema.length > 0 ? (
@@ -425,44 +462,6 @@ export function Generate3DNode({ id, data, selected }: NodeProps<Generate3DNodeT
           />
         )}
 
-        {/* Inline parameter panel */}
-        {inlineParametersEnabled && (
-          <InlineParameterPanel
-            expanded={isParamsExpanded}
-            onToggle={handleToggleParams}
-            nodeId={id}
-            selected={selected}
-          >
-            {/* Model selector: Browse button + current model display */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-neutral-200 truncate">
-                  {displayTitle}
-                </div>
-                <div className="text-[9px] text-neutral-500">
-                  {currentProvider}
-                </div>
-              </div>
-              <button
-                onClick={() => setIsBrowseDialogOpen(true)}
-                className="nodrag nopan shrink-0 px-2 py-1 text-[10px] bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 rounded text-neutral-300 transition-colors"
-              >
-                Browse
-              </button>
-            </div>
-
-            {/* External provider parameters - reuse ModelParameters component */}
-            {nodeData.selectedModel?.modelId && (
-              <ModelParameters
-                modelId={nodeData.selectedModel.modelId}
-                provider={currentProvider}
-                parameters={nodeData.parameters || {}}
-                onParametersChange={handleParametersChange}
-                onInputsLoaded={handleInputsLoaded}
-              />
-            )}
-          </InlineParameterPanel>
-        )}
       </div>
     </BaseNode>
 

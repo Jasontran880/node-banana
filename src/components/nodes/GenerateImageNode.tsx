@@ -538,6 +538,106 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       fullBleed
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputImage}
+      settingsPanel={inlineParametersEnabled ? (
+        <InlineParameterPanel
+          expanded={isParamsExpanded}
+          onToggle={handleToggleParams}
+          nodeId={id}
+          selected={selected}
+        >
+          {/* Gemini-specific controls */}
+          {isGeminiProvider && currentModelId && (
+            <div className="space-y-1.5">
+              {/* Model selector */}
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-neutral-400 shrink-0">Model</label>
+                <select
+                  value={currentModelId}
+                  onChange={handleModelChange}
+                  className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
+                >
+                  {GEMINI_IMAGE_MODELS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Aspect Ratio */}
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-neutral-400 shrink-0">Aspect Ratio</label>
+                <select
+                  value={nodeData.aspectRatio || "1:1"}
+                  onChange={handleAspectRatioChange}
+                  className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
+                >
+                  {aspectRatios.map((ratio) => (
+                    <option key={ratio} value={ratio}>
+                      {ratio}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Resolution (if supported) */}
+              {supportsResolution && (
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-neutral-400 shrink-0">Resolution</label>
+                  <select
+                    value={nodeData.resolution || "2K"}
+                    onChange={handleResolutionChange}
+                    className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
+                  >
+                    {resolutions.map((res) => (
+                      <option key={res} value={res}>
+                        {res}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Google Search toggle */}
+              {(currentModelId === "nano-banana-pro" || currentModelId === "nano-banana-2") && (
+                <label className="flex items-center gap-1.5 text-[11px] text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={nodeData.useGoogleSearch || false}
+                    onChange={handleGoogleSearchToggle}
+                    className="nodrag nopan w-3 h-3 rounded bg-[#1a1a1a] text-neutral-600 focus:ring-1 focus:ring-neutral-600 focus:ring-offset-0"
+                  />
+                  Google Search
+                </label>
+              )}
+
+              {/* Image Search toggle (NB2 only) */}
+              {currentModelId === "nano-banana-2" && (
+                <label className="flex items-center gap-1.5 text-[11px] text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={nodeData.useImageSearch || false}
+                    onChange={handleImageSearchToggle}
+                    className="nodrag nopan w-3 h-3 rounded bg-[#1a1a1a] text-neutral-600 focus:ring-1 focus:ring-neutral-600 focus:ring-offset-0"
+                  />
+                  Image Search
+                </label>
+              )}
+            </div>
+          )}
+
+          {/* External provider parameters - reuse ModelParameters component */}
+          {!isGeminiProvider && nodeData.selectedModel?.modelId && (
+            <ModelParameters
+              modelId={nodeData.selectedModel.modelId}
+              provider={currentProvider}
+              parameters={nodeData.parameters || {}}
+              onParametersChange={handleParametersChange}
+              onInputsLoaded={handleInputsLoaded}
+            />
+          )}
+        </InlineParameterPanel>
+      ) : undefined}
     >
       {/* Input handles - ALWAYS use same IDs and positions for connection stability */}
       {/* Image input at 35%, Text input at 65% - never changes regardless of model */}
@@ -602,7 +702,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         Image
       </div>
 
-      <div className={`relative w-full h-full min-h-0 overflow-hidden ${inlineParametersEnabled && isParamsExpanded ? "rounded-t-lg" : "rounded-lg"}`}>
+      <div className="relative w-full h-full min-h-0 overflow-hidden rounded-lg">
         {/* Preview area */}
         {nodeData.outputImage ? (
           <>
@@ -752,107 +852,6 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         )}
       </div>
 
-      {/* Inline parameter panel */}
-      {inlineParametersEnabled && (
-        <InlineParameterPanel
-          expanded={isParamsExpanded}
-          onToggle={handleToggleParams}
-          nodeId={id}
-          selected={selected}
-        >
-          {/* Gemini-specific controls */}
-          {isGeminiProvider && currentModelId && (
-            <div className="space-y-1.5">
-              {/* Model selector */}
-              <div className="flex items-center gap-2">
-                <label className="text-[11px] text-neutral-400 shrink-0">Model</label>
-                <select
-                  value={currentModelId}
-                  onChange={handleModelChange}
-                  className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
-                >
-                  {GEMINI_IMAGE_MODELS.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Aspect Ratio */}
-              <div className="flex items-center gap-2">
-                <label className="text-[11px] text-neutral-400 shrink-0">Aspect Ratio</label>
-                <select
-                  value={nodeData.aspectRatio || "1:1"}
-                  onChange={handleAspectRatioChange}
-                  className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
-                >
-                  {aspectRatios.map((ratio) => (
-                    <option key={ratio} value={ratio}>
-                      {ratio}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Resolution (if supported) */}
-              {supportsResolution && (
-                <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-neutral-400 shrink-0">Resolution</label>
-                  <select
-                    value={nodeData.resolution || "2K"}
-                    onChange={handleResolutionChange}
-                    className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
-                  >
-                    {resolutions.map((res) => (
-                      <option key={res} value={res}>
-                        {res}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Google Search toggle */}
-              {(currentModelId === "nano-banana-pro" || currentModelId === "nano-banana-2") && (
-                <label className="flex items-center gap-1.5 text-[11px] text-neutral-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={nodeData.useGoogleSearch || false}
-                    onChange={handleGoogleSearchToggle}
-                    className="nodrag nopan w-3 h-3 rounded bg-[#1a1a1a] text-neutral-600 focus:ring-1 focus:ring-neutral-600 focus:ring-offset-0"
-                  />
-                  Google Search
-                </label>
-              )}
-
-              {/* Image Search toggle (NB2 only) */}
-              {currentModelId === "nano-banana-2" && (
-                <label className="flex items-center gap-1.5 text-[11px] text-neutral-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={nodeData.useImageSearch || false}
-                    onChange={handleImageSearchToggle}
-                    className="nodrag nopan w-3 h-3 rounded bg-[#1a1a1a] text-neutral-600 focus:ring-1 focus:ring-neutral-600 focus:ring-offset-0"
-                  />
-                  Image Search
-                </label>
-              )}
-            </div>
-          )}
-
-          {/* External provider parameters - reuse ModelParameters component */}
-          {!isGeminiProvider && nodeData.selectedModel?.modelId && (
-            <ModelParameters
-              modelId={nodeData.selectedModel.modelId}
-              provider={currentProvider}
-              parameters={nodeData.parameters || {}}
-              onParametersChange={handleParametersChange}
-              onInputsLoaded={handleInputsLoaded}
-            />
-          )}
-        </InlineParameterPanel>
-      )}
     </BaseNode>
 
     {/* Model browse dialog */}

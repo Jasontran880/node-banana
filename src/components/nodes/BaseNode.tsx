@@ -23,6 +23,8 @@ interface BaseNodeProps {
   aspectFitMedia?: string | null;
   /** When true, bottom corners lose rounding so the selection ring connects to the settings panel below */
   settingsExpanded?: boolean;
+  /** Settings panel rendered outside the bordered area so it shares the node's full width */
+  settingsPanel?: ReactNode;
 }
 
 /**
@@ -65,6 +67,7 @@ export function BaseNode({
   fullBleed = false,
   aspectFitMedia,
   settingsExpanded = false,
+  settingsPanel,
 }: BaseNodeProps) {
   const currentNodeIds = useWorkflowStore((state) => state.currentNodeIds);
   const setHoveredNodeId = useWorkflowStore((state) => state.setHoveredNodeId);
@@ -129,19 +132,31 @@ export function BaseNode({
       />
       <div
         className={`
-          h-full w-full flex flex-col overflow-visible
-          ${fullBleed ? `${settingsExpanded && selected ? "rounded-t-lg" : "rounded-lg"} bg-neutral-800/50 border border-neutral-700/40` : "bg-neutral-800 rounded-lg shadow-lg border"}
+          h-full w-full flex flex-col overflow-visible relative
+          ${fullBleed
+            ? `${settingsExpanded ? "rounded-t-lg border-b-0" : "rounded-lg"} bg-neutral-800/50 border border-neutral-700/40`
+            : `bg-neutral-800 ${settingsExpanded ? "rounded-t-lg border-b-0" : "rounded-lg"} shadow-lg border`}
           ${fullBleed ? "" : (isCurrentlyExecuting || isExecuting ? "border-blue-500 ring-1 ring-blue-500/20" : "border-neutral-700/60")}
           ${fullBleed ? "" : (hasError ? "border-red-500" : "")}
-          ${fullBleed && selected ? "ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
-          ${!fullBleed && selected ? "border-blue-500 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
+          ${fullBleed && selected && !settingsExpanded ? "ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
+          ${!fullBleed && selected && !settingsExpanded ? "border-blue-500 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
+          ${!fullBleed && selected && settingsExpanded ? "border-blue-500" : ""}
           ${className}
         `}
         onMouseEnter={() => setHoveredNodeId(id)}
         onMouseLeave={() => setHoveredNodeId(null)}
       >
+        {/* When settings panel is expanded, render the selection ring as a separate clipped overlay
+            so it doesn't show a line at the bottom — the InlineParameterPanel draws the bottom half */}
+        {settingsExpanded && selected && (
+          <div
+            className="absolute -inset-px rounded-t-lg ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25 pointer-events-none"
+            style={{ clipPath: 'inset(-20px -20px 1px -20px)' }}
+          />
+        )}
         <div className={contentClassName ?? (fullBleed ? "flex-1 min-h-0 relative" : "px-3 pb-4 flex-1 min-h-0 overflow-hidden flex flex-col")}>{children}</div>
       </div>
+      {settingsPanel}
     </div>
   );
 }

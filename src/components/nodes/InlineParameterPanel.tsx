@@ -21,14 +21,17 @@ export function InlineParameterPanel({
   nodeId,
   selected = false,
 }: InlineParameterPanelProps) {
-  // When expanded + selected, overlap with BaseNode ring using negative margin
-  // so the two rings merge into one continuous outline
+  // When expanded + selected, draw ring on bottom half and clip the top edge
+  // so it merges seamlessly with BaseNode's ring (which clips its bottom edge)
   const ringClass = expanded && selected
-    ? "ring-2 ring-blue-500/40 rounded-b-lg -mt-[3px] pt-[3px]"
+    ? "ring-2 ring-blue-500/40 rounded-b-lg"
     : "";
+  const ringStyle = expanded && selected
+    ? { clipPath: 'inset(0 -20px -20px -20px)' }
+    : undefined;
 
   return (
-    <div className={`w-full ${ringClass}`}>
+    <div className={`w-full ${ringClass}`} style={ringStyle}>
       {/* Settings toggle button — no background when collapsed, floats below node edge */}
       <button
         type="button"
