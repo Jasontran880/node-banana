@@ -137,7 +137,7 @@ export function SplitGridNode({ id, data, selected }: NodeProps<SplitGridNodeTyp
           <div className="flex items-center justify-between">
             {nodeData.isConfigured ? (
               <div className="text-[10px] text-neutral-500">
-                {nodeData.childNodeIds.length} generate sets created
+                {nodeData.childNodeIds?.length ?? 0} generate sets created
               </div>
             ) : (
               <div className="text-[10px] text-amber-400">
