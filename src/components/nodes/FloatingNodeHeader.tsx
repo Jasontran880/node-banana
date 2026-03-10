@@ -187,26 +187,6 @@ export const FloatingNodeHeader = memo(function FloatingNodeHeader({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isEditingComment, handleCommentSubmit]);
 
-  // Click outside handler for focused comment tooltip
-  useEffect(() => {
-    const handleClickOutsideTooltip = (e: MouseEvent) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
-        // Clear focused comment (would need to be passed as a callback)
-      }
-    };
-
-    if (isCommentFocused && !isEditingComment) {
-      const timer = setTimeout(() => {
-        document.addEventListener("mousedown", handleClickOutsideTooltip);
-      }, 100);
-      return () => {
-        clearTimeout(timer);
-        document.removeEventListener("mousedown", handleClickOutsideTooltip);
-      };
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutsideTooltip);
-  }, [isCommentFocused, isEditingComment]);
-
   // Determine if controls should be visible
   const showControls = isHovered || selected;
 
