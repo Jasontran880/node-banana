@@ -1,6 +1,6 @@
 "use client";
 
-import React, { ReactNode } from "react";
+import React, { ReactNode, useRef, useState, useEffect } from "react";
 
 interface InlineParameterPanelProps {
   expanded: boolean;
@@ -11,7 +11,7 @@ interface InlineParameterPanelProps {
 
 /**
  * Collapsible parameter container for inline display within generation nodes.
- * Provides a chevron toggle button and instant expand/collapse.
+ * Provides a chevron toggle button and smooth animated expand/collapse.
  */
 function InlineParameterPanelInner({
   expanded,
@@ -19,6 +19,15 @@ function InlineParameterPanelInner({
   children,
   nodeId,
 }: InlineParameterPanelProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  useEffect(() => {
+    if (expanded && contentRef.current) {
+      setContentHeight(contentRef.current.scrollHeight);
+    }
+  }, [expanded, children]);
+
   return (
     <>
       {/* Settings toggle button — no background when collapsed, floats below node edge */}
@@ -45,15 +54,16 @@ function InlineParameterPanelInner({
         </svg>
       </button>
 
-      {/* Content area — instant show/hide */}
-      {expanded && (
-        <div
-          id={`params-${nodeId}`}
-          className="nodrag nopan nowheel bg-[#2a2a2a] px-3 pt-2 pb-3 rounded-b-lg"
-        >
+      {/* Content area — smooth height animation */}
+      <div
+        id={`params-${nodeId}`}
+        className="nodrag nopan nowheel bg-[#2a2a2a] overflow-hidden transition-[max-height] duration-150 ease-out"
+        style={{ maxHeight: expanded ? contentHeight : 0 }}
+      >
+        <div ref={contentRef} className="px-3 pt-2 pb-3 rounded-b-lg">
           {children}
         </div>
-      )}
+      </div>
     </>
   );
 }

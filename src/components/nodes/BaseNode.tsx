@@ -75,6 +75,7 @@ export function BaseNode({
   const { getNodes, setNodes } = useReactFlow();
 
   const settingsPanelRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const trackedSettingsHeightRef = useRef(0);
 
   // Adjust node height when settings collapse
@@ -82,6 +83,13 @@ export function BaseNode({
     if (!settingsExpanded && trackedSettingsHeightRef.current > 0) {
       const heightToRemove = trackedSettingsHeightRef.current;
       trackedSettingsHeightRef.current = 0;
+
+      // Lock content height to prevent image flicker during resize
+      const contentEl = contentRef.current;
+      if (contentEl) {
+        contentEl.style.height = contentEl.offsetHeight + "px";
+      }
+
       setNodes((nodes) =>
         nodes.map((node) => {
           if (node.id !== id) return node;
@@ -90,6 +98,13 @@ export function BaseNode({
           return applyNodeDimensions(node, getNodeDimension(node, "width"), newHeight);
         })
       );
+
+      // Release locked height after layout settles
+      requestAnimationFrame(() => {
+        if (contentEl) {
+          contentEl.style.height = "";
+        }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsExpanded]);
@@ -108,6 +123,13 @@ export function BaseNode({
         if (Math.abs(delta) < 2) continue; // Ignore sub-pixel changes
 
         trackedSettingsHeightRef.current = newPanelHeight;
+
+        // Lock content height to prevent image flicker during resize
+        const contentEl = contentRef.current;
+        if (contentEl) {
+          contentEl.style.height = contentEl.offsetHeight + "px";
+        }
+
         setNodes((nodes) =>
           nodes.map((node) => {
             if (node.id !== id) return node;
@@ -116,6 +138,13 @@ export function BaseNode({
             return applyNodeDimensions(node, getNodeDimension(node, "width"), newHeight);
           })
         );
+
+        // Release locked height after layout settles
+        requestAnimationFrame(() => {
+          if (contentEl) {
+            contentEl.style.height = "";
+          }
+        });
       }
     });
 
@@ -214,7 +243,7 @@ export function BaseNode({
           setHoveredNodeId(null);
         }}
       >
-        <div className={contentClassName ?? (fullBleed ? "flex-1 min-h-0 relative" : "px-3 pb-4 flex-1 min-h-0 overflow-hidden flex flex-col")}>{children}</div>
+        <div ref={contentRef} className={contentClassName ?? (fullBleed ? "flex-1 min-h-0 relative" : "px-3 pb-4 flex-1 min-h-0 overflow-hidden flex flex-col")}>{children}</div>
       </div>
       {settingsPanel && (
         <div ref={settingsPanelRef}>
