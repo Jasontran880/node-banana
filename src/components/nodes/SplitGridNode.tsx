@@ -6,11 +6,13 @@ import { BaseNode } from "./BaseNode";
 import { useWorkflowStore } from "@/store/workflowStore";
 import { SplitGridNodeData } from "@/types";
 import { SplitGridSettingsModal } from "../SplitGridSettingsModal";
+import { useAdaptiveImageSrc } from "@/hooks/useAdaptiveImageSrc";
 
 type SplitGridNodeType = Node<SplitGridNodeData, "splitGrid">;
 
 export function SplitGridNode({ id, data, selected }: NodeProps<SplitGridNodeType>) {
   const nodeData = data;
+  const adaptiveSourceImage = useAdaptiveImageSrc(nodeData.sourceImage, id);
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const regenerateNode = useWorkflowStore((state) => state.regenerateNode);
   const isRunning = useWorkflowStore((state) => state.isRunning);
@@ -67,7 +69,7 @@ export function SplitGridNode({ id, data, selected }: NodeProps<SplitGridNodeTyp
         {nodeData.sourceImage ? (
           <div className="relative w-full h-full">
             <img
-              src={nodeData.sourceImage}
+              src={adaptiveSourceImage ?? undefined}
               alt="Source grid"
               className="w-full h-full object-contain rounded-lg"
             />
