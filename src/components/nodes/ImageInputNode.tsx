@@ -91,15 +91,6 @@ export function ImageInputNode({ id, data, selected }: NodeProps<ImageInputNodeT
       aspectFitMedia={nodeData.image}
       fullBleed
     >
-      {/* Reference input handle for visual links from Split Grid node */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="reference"
-        data-handletype="reference"
-        className="!bg-gray-500"
-      />
-
       <input
         ref={fileInputRef}
         type="file"
@@ -148,6 +139,14 @@ export function ImageInputNode({ id, data, selected }: NodeProps<ImageInputNodeT
         </div>
       )}
 
+      {/* Handles rendered after visual content so they paint on top */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="reference"
+        data-handletype="reference"
+        className="!bg-gray-500"
+      />
       <Handle
         type="source"
         position={Position.Right}
