@@ -383,7 +383,7 @@ function GroupControls({ groupId, zoom }: GroupControlsProps) {
                               <button
                                 key={color}
                                 onClick={() => handleColorChange(color)}
-                                className={`absolute w-6 h-6 rounded-full border-2 transition-[transform,border-color] duration-150 hover:scale-110 ${
+                                className={`absolute w-6 h-6 rounded-full border-2 transition-[transform,border-color] duration-150 hover:scale-125 ${
                                   group.color === color
                                     ? "border-white"
                                     : "border-transparent hover:border-white/50"
