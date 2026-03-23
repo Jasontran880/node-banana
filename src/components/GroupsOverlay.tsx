@@ -368,7 +368,7 @@ function GroupControls({ groupId, zoom }: GroupControlsProps) {
                         <div className="absolute bottom-full left-0 mb-1 z-50 pointer-events-auto">
                           {COLOR_OPTIONS.map(({ color, label }, index) => {
                             const totalItems = COLOR_OPTIONS.length;
-                            const arcSpread = 150;
+                            const arcSpread = 180;
                             const startAngle = -130 - arcSpread / 2;
                             const angleStep = arcSpread / (totalItems - 1);
                             const angle = startAngle + index * angleStep;
