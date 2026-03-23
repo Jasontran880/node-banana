@@ -390,7 +390,8 @@ function GroupControls({ groupId, zoom }: GroupControlsProps) {
                                 }`}
                                 style={{
                                   backgroundColor: PICKER_PREVIEW_COLORS[color],
-                                  transform: `translate(${finalX}px, ${finalY}px)`,
+                                  left: finalX,
+                                  top: finalY,
                                   animation: `colorFanIn-${index} 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards`,
                                   animationDelay: `${index * 0.025}s`,
                                   opacity: 0,
@@ -401,11 +402,15 @@ function GroupControls({ groupId, zoom }: GroupControlsProps) {
                                   @keyframes colorFanIn-${index} {
                                     0% {
                                       opacity: 0;
-                                      transform: translate(0px, 0px) scale(0.3);
+                                      left: 0px;
+                                      top: 0px;
+                                      transform: scale(0.3);
                                     }
                                     100% {
                                       opacity: 1;
-                                      transform: translate(${finalX}px, ${finalY}px) scale(1);
+                                      left: ${finalX}px;
+                                      top: ${finalY}px;
+                                      transform: scale(1);
                                     }
                                   }
                                 `}</style>
