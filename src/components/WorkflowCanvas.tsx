@@ -272,7 +272,7 @@ export const isPanningRef = { current: false };
 export const isDraggingNodeRef = { current: false };
 
 export function WorkflowCanvas() {
-  const { nodes, edges, groups, isModalOpen, showQuickstart, navigationTarget, canvasNavigationSettings, dimmedNodeIds } =
+  const { nodes, edges, groups, isModalOpen, showQuickstart, navigationTarget, canvasNavigationSettings, dimmedNodeIds, skippedNodeIds } =
     useWorkflowStore(useShallow((state) => ({
       nodes: state.nodes,
       edges: state.edges,
@@ -282,6 +282,7 @@ export function WorkflowCanvas() {
       navigationTarget: state.navigationTarget,
       canvasNavigationSettings: state.canvasNavigationSettings,
       dimmedNodeIds: state.dimmedNodeIds,
+      skippedNodeIds: state.skippedNodeIds,
     })));
   const onNodesChange = useWorkflowStore((state) => state.onNodesChange);
   const onEdgesChange = useWorkflowStore((state) => state.onEdgesChange);
@@ -337,24 +338,28 @@ export function WorkflowCanvas() {
     }
   }, [navigationTarget, nodes, setCenter, setNavigationTarget]);
 
-  // Apply dimming className to nodes downstream of disabled Switch outputs
+  // Apply dimming className to nodes downstream of disabled Switch outputs or skipped by optional inputs
   const allNodes = useMemo(() => {
     return nodes.map((node) => {
       // Never dim Switch or ConditionalSwitch nodes themselves
       if (node.type === "switch" || node.type === "conditionalSwitch") return node;
 
       const isDimmed = dimmedNodeIds.has(node.id);
-      const dimClass = isDimmed ? "switch-dimmed" : "";
+      const isSkipped = skippedNodeIds.has(node.id);
+      const extraClasses = [
+        isDimmed ? "switch-dimmed" : "",
+        isSkipped ? "node-skipped" : "",
+      ].filter(Boolean).join(" ");
 
-      // Preserve existing className if any, add/remove dimmed class
-      const baseClass = (node.className || "").replace(/\bswitch-dimmed\b/g, "").trim();
-      const newClass = dimClass ? `${baseClass} ${dimClass}`.trim() : baseClass;
+      // Preserve existing className if any, add/remove dimmed/skipped classes
+      const baseClass = (node.className || "").replace(/\bswitch-dimmed\b/g, "").replace(/\bnode-skipped\b/g, "").trim();
+      const newClass = extraClasses ? `${baseClass} ${extraClasses}`.trim() : baseClass;
 
       // Only create new node object if className changed
       if (node.className === newClass) return node;
       return { ...node, className: newClass };
     });
-  }, [nodes, dimmedNodeIds]);
+  }, [nodes, dimmedNodeIds, skippedNodeIds]);
 
   // Node title mapping for FloatingNodeHeaders
   const NODE_TITLES: Record<string, string> = {
