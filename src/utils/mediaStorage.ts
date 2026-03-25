@@ -158,7 +158,7 @@ async function externalizeNodeMedia(
         newData = { ...d, audioFile: null };
       } else if (isDataUrl(d.audioFile)) {
         const audioRef = await saveAudioAndGetRef(d.audioFile, workflowPath, savedMediaIds);
-        newData = { ...d, audioFile: null, audioFileRef: audioRef };
+        newData = { ...d, audioFile: null, audioFileRef: audioRef || undefined };
       } else {
         newData = d;
       }
@@ -314,7 +314,8 @@ async function externalizeNodeMedia(
         } else if (isDataUrl(d.outputVideo)) {
           const selectedIndex = d.selectedVideoHistoryIndex || 0;
           const expectedRef = d.videoHistory?.[selectedIndex]?.id;
-          outputVideoRef = await saveVideoAndGetRef(d.outputVideo, workflowPath, savedMediaIds, expectedRef);
+          const videoRef = await saveVideoAndGetRef(d.outputVideo, workflowPath, savedMediaIds, expectedRef);
+          outputVideoRef = videoRef || undefined;
           outputVideo = null;
         }
       }
@@ -374,7 +375,8 @@ async function externalizeNodeMedia(
         } else if (isDataUrl(d.outputAudio)) {
           const selectedIndex = d.selectedAudioHistoryIndex || 0;
           const expectedRef = d.audioHistory?.[selectedIndex]?.id;
-          outputAudioRef = await saveAudioAndGetRef(d.outputAudio, workflowPath, savedMediaIds, expectedRef);
+          const audioRef = await saveAudioAndGetRef(d.outputAudio, workflowPath, savedMediaIds, expectedRef);
+          outputAudioRef = audioRef || undefined;
           outputAudio = null;
         }
       }
