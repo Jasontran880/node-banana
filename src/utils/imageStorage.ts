@@ -270,6 +270,14 @@ async function externalizeNodeImages(
       break;
     }
 
+    case "outputGallery": {
+      const d = data as import("@/types").OutputGalleryNodeData;
+      // OutputGallery content is regenerated on each workflow run
+      // Clear images array to keep workflow file small
+      newData = { ...d, images: [] };
+      break;
+    }
+
     case "splitGrid": {
       const d = data as import("@/types").SplitGridNodeData;
       // SplitGrid source is input content, save to inputs
@@ -506,6 +514,12 @@ async function hydrateNodeImages(
     case "output": {
       // Output content is not persisted - it's regenerated on each workflow run
       // and saved to /outputs directory during execution
+      newData = data;
+      break;
+    }
+
+    case "outputGallery": {
+      // OutputGallery content is not persisted - it's regenerated on each workflow run
       newData = data;
       break;
     }
