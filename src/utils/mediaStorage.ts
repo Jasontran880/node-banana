@@ -613,10 +613,9 @@ async function saveVideoAndGetRef(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workflowPath,
-          id: videoId,
-          data: videoData,
-          type: "video",
+          directoryPath: workflowPath,
+          imageId: videoId,
+          video: videoData,
         }),
       },
       60000 // 60s timeout for larger video files
@@ -680,10 +679,9 @@ async function saveAudioAndGetRef(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workflowPath,
-          id: audioId,
-          data: audioData,
-          type: "audio",
+          directoryPath: workflowPath,
+          imageId: audioId,
+          audio: audioData,
         }),
       },
       60000 // 60s timeout for larger audio files
@@ -1038,12 +1036,14 @@ async function loadMediaById(
     response = await fetch(`/api/workflow-images?${params.toString()}`);
   } else {
     // Use load-generation API for videos and audio
-    const params = new URLSearchParams({
-      workflowPath,
-      id: mediaId,
+    response = await fetch("/api/load-generation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directoryPath: workflowPath,
+        imageId: mediaId,
+      }),
     });
-
-    response = await fetch(`/api/load-generation?${params.toString()}`);
   }
 
   const result = await response.json();
