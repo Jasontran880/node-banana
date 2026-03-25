@@ -28,7 +28,7 @@ import {
 } from "@/types";
 import { useToast } from "@/components/Toast";
 import { logger } from "@/utils/logger";
-import { externalizeWorkflowImages, hydrateWorkflowImages } from "@/utils/imageStorage";
+import { externalizeWorkflowMedia, hydrateWorkflowMedia } from "@/utils/mediaStorage";
 import { EditOperation, applyEditOperations as executeEditOps } from "@/lib/chat/editOperations";
 import {
   loadSaveConfigs,
@@ -1698,13 +1698,13 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     // Determine the workflow directory path (passed in, from saved config, or embedded in legacy workflow JSON)
     const directoryPath = workflowPath || savedConfig?.directoryPath || workflow.directoryPath || null;
 
-    // Hydrate images if we have a directory path and the workflow has image refs
+    // Hydrate media if we have a directory path and the workflow has media refs
     let hydratedWorkflow = workflow;
     if (directoryPath) {
       try {
-        hydratedWorkflow = await hydrateWorkflowImages(workflow, directoryPath);
+        hydratedWorkflow = await hydrateWorkflowMedia(workflow, directoryPath);
       } catch (error) {
-        console.error("Failed to hydrate workflow images:", error);
+        console.error("Failed to hydrate workflow media:", error);
         // Continue with original workflow if hydration fails
       }
     }
@@ -1904,9 +1904,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         groups: groups && Object.keys(groups).length > 0 ? groups : undefined,
       };
 
-      // If external image storage is enabled, externalize images before saving
+      // If external media storage is enabled, externalize media before saving
       if (useExternalImageStorage) {
-        workflow = await externalizeWorkflowImages(workflow, saveDirectoryPath);
+        workflow = await externalizeWorkflowMedia(workflow, saveDirectoryPath);
       }
 
       const response = await fetch("/api/workflow", {
@@ -1924,22 +1924,23 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       if (result.success) {
         const timestamp = Date.now();
 
-        // If we externalized images, update store nodes with the refs
-        // This prevents duplicate images on subsequent saves
+        // If we externalized media, update store nodes with the refs
+        // This prevents duplicate media on subsequent saves
         if (useExternalImageStorage && workflow.nodes !== currentNodes) {
-          // Merge refs from externalized nodes into current nodes (keeping image data)
+          // Merge refs from externalized nodes into current nodes (keeping media data)
           const nodesWithRefs = currentNodes.map((node, index) => {
             const externalizedNode = workflow.nodes[index];
             if (!externalizedNode || node.id !== externalizedNode.id) {
               return node; // Safety check - nodes should match
             }
 
-            // Copy refs from externalized node while keeping current image data
+            // Copy refs from externalized node while keeping current media data
             // Use type assertion to access ref fields that may exist on various node types
             const mergedData = { ...node.data } as Record<string, unknown>;
             const extData = externalizedNode.data as Record<string, unknown>;
 
             // Copy ref fields based on node type
+            // Image refs
             if (extData.imageRef && typeof extData.imageRef === 'string') {
               mergedData.imageRef = extData.imageRef;
             }
@@ -1951,6 +1952,26 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
             }
             if (extData.inputImageRefs && Array.isArray(extData.inputImageRefs)) {
               mergedData.inputImageRefs = extData.inputImageRefs;
+            }
+            if (extData.imageARef && typeof extData.imageARef === 'string') {
+              mergedData.imageARef = extData.imageARef;
+            }
+            if (extData.imageBRef && typeof extData.imageBRef === 'string') {
+              mergedData.imageBRef = extData.imageBRef;
+            }
+            if (extData.capturedImageRef && typeof extData.capturedImageRef === 'string') {
+              mergedData.capturedImageRef = extData.capturedImageRef;
+            }
+            // Video refs
+            if (extData.outputVideoRef && typeof extData.outputVideoRef === 'string') {
+              mergedData.outputVideoRef = extData.outputVideoRef;
+            }
+            // Audio refs
+            if (extData.audioFileRef && typeof extData.audioFileRef === 'string') {
+              mergedData.audioFileRef = extData.audioFileRef;
+            }
+            if (extData.outputAudioRef && typeof extData.outputAudioRef === 'string') {
+              mergedData.outputAudioRef = extData.outputAudioRef;
             }
 
             return { ...node, data: mergedData as WorkflowNodeData } as WorkflowNode;
