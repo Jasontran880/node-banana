@@ -627,8 +627,9 @@ async function saveVideoAndGetRef(
       throw new Error(`Failed to save video: ${result.error}`);
     }
 
-    savedMediaIds.set(hash, videoId);
-    return videoId;
+    const actualId = result.imageId || videoId;
+    savedMediaIds.set(hash, actualId);
+    return actualId;
   })();
 
   if (!existingId) {
@@ -693,8 +694,9 @@ async function saveAudioAndGetRef(
       throw new Error(`Failed to save audio: ${result.error}`);
     }
 
-    savedMediaIds.set(hash, audioId);
-    return audioId;
+    const actualId = result.imageId || audioId;
+    savedMediaIds.set(hash, actualId);
+    return actualId;
   })();
 
   if (!existingId) {
@@ -1054,7 +1056,9 @@ async function loadMediaById(
     return ""; // Return empty string to avoid breaking the workflow
   }
 
-  const mediaData = mediaType === "image" ? result.image : result.data;
+  const mediaData = mediaType === "image" ? result.image
+    : mediaType === "video" ? result.video
+    : result.audio;
   loadedMedia.set(mediaId, mediaData);
   return mediaData;
 }
