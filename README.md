@@ -1,41 +1,59 @@
-# Node Banana
+<div align="center">
 
-> **Important note:** This is in early development, it probably has some issues. Use Chrome. For support or raising any issues join the [discord](https://discord.com/invite/89Nr6EKkTf). See the [docs](https://node-banana-docs.vercel.app/) for help, installation guides, and user guides.
+<img width="full" alt="Node Banana" src="public/node-banana.png" />
 
-Node Banana is node-based workflow application for generating images with Nano Banana Pro. Build image generation pipelines by connecting nodes on a visual canvas. Recent Fal and Replicate integration allows for complex image and video pipelines from any provider, but be aware this is still in testing. 
+### The Visual Workflow Editor for AI Image Generation
 
-Built mainly with Opus 4.5.
+[![GitHub stars](https://img.shields.io/github/stars/williavs/node-banana?style=flat&logo=github)](https://github.com/williavs/node-banana/stargazers)
+[![License](https://img.shields.io/github/license/williavs/node-banana?style=flat)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-555?logo=discord)](https://discord.com/invite/89Nr6EKkTf)
 
-![Node Banana Screenshot](public/node-banana.png)
+<br />
+
+Build AI image and video generation pipelines by connecting nodes on a visual canvas.<br />
+Multi-provider support. Prompt-to-workflow generation. Built mainly with Claude.
+
+<br />
+
+[**Documentation**](https://node-banana-docs.vercel.app/) &nbsp;&bull;&nbsp; [Discord](https://discord.com/invite/89Nr6EKkTf)
+
+<br />
+
+</div>
+
+## Build Complex AI Pipelines Visually
+
+Node Banana is a node-based workflow editor for AI image generation. Drag nodes onto an infinite canvas, connect them with typed handles, and execute pipelines that call AI APIs in dependency order.
+
+- **Generate workflows from natural language** or choose from preset templates
+- **Chain multiple AI models together** across providers in a single pipeline
+- **Annotate and edit images** with a full-screen drawing editor
+- **Lock node groups** to skip them during execution
+- **Save and share workflows** as portable JSON files
 
 ## Features
 
-- **Prompt to Workflow** - Generate complete workflows from natural language descriptions or choose from preset templates (Gemini only for now)
-- **Visual Node Editor** - Drag-and-drop nodes onto an infinite canvas with pan and zoom
-- **Image Annotation** - Full-screen editor with drawing tools (rectangles, circles, arrows, freehand, text)
-- **AI Image Generation** - Generate images using Google Gemini models
-- **Text Generation** - Generate text using Google Gemini or OpenAI models
-- **Workflow Chaining** - Connect multiple nodes to create complex pipelines
-- **Save/Load Workflows** - Export and import workflows as JSON files
-- **Group Locking** - Lock node groups to skip them during execution
+| Feature | Description |
+|:--------|:------------|
+| **Prompt to Workflow** | Generate complete workflows from natural language descriptions |
+| **Visual Node Editor** | Drag-and-drop nodes onto an infinite canvas with pan and zoom |
+| **Image Annotation** | Full-screen editor with drawing tools (rectangles, circles, arrows, freehand, text) |
+| **AI Image Generation** | Generate images using Google Gemini, Replicate, fal.ai, Kie.ai, and more |
+| **Text Generation** | Generate text using Google Gemini or OpenAI models |
+| **Workflow Chaining** | Connect multiple nodes to create complex multi-step pipelines |
+| **Group Locking** | Lock node groups to skip them during execution |
+| **Save/Load** | Export and import workflows as JSON files |
 
-## Multi-Provider Support (Beta)
+## Supported Providers
 
-In addition to Google Gemini, Node Banana now supports:
-- **Replicate** - Access thousands of open-source models
-- **fal.ai** - Fast inference for image and video generation
-
-Configure API keys in Project Settings to enable these providers.
-
-## Tech Stack
-
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Node Editor**: @xyflow/react (React Flow)
-- **Canvas**: Konva.js / react-konva
-- **State Management**: Zustand
-- **Styling**: Tailwind CSS
-- **AI**: Google Gemini API, OpenAI API, Replicate (Beta), fal.ai (Beta)
+| Provider | Status |
+|:---------|:-------|
+| [Google Gemini](https://ai.google.dev/) | Fully supported |
+| [Replicate](https://replicate.com/) | Supported |
+| [fal.ai](https://fal.ai/) | Supported |
+| [Kie.ai](https://kie.ai/) | Supported |
+| [WaveSpeed](https://wavespeed.ai/) | Supported |
+| [OpenAI](https://openai.com/) | LLM only |
 
 ## Getting Started
 
@@ -44,6 +62,17 @@ Configure API keys in Project Settings to enable these providers.
 - Node.js 18+
 - npm
 
+### Quick Start
+
+```bash
+git clone https://github.com/williavs/node-banana.git
+cd node-banana
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
 ### Environment Variables
 
 Create a `.env.local` file in the root directory:
@@ -51,23 +80,10 @@ Create a `.env.local` file in the root directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key      # Optional, for OpenAI LLM provider
-REPLICATE_API_KEY=your_replicate_api_key  # Optional, beta
-FAL_API_KEY=your_fal_api_key              # Optional, beta
+KIE_API_KEY=your_kie_api_key            # Optional, for Kie.ai models
 ```
 
-### Installation
-
-```bash
-npm install
-```
-
-### Development
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Additional provider API keys can be configured in Project Settings within the app.
 
 ### Build
 
@@ -78,30 +94,37 @@ npm run start
 
 ## Example Workflows
 
-The `/examples` directory contains some example workflow files from my personal projects. To try them:
+The `/examples` directory contains example workflow files. To try them:
 
 1. Start the dev server with `npm run dev`
 2. Drag any `.json` file from the `/examples` folder into the browser window
-3. Make sure you review each of the prompts before starting, these are fairly targetted to the examples. 
+3. Review the prompts in each node before running — they're targeted to specific use cases
 
-## Usage
+## Node Types
 
-1. **Add nodes** - Click the floating action bar to add nodes to the canvas
-2. **Connect nodes** - Drag from output handles to input handles (matching types only)
-3. **Configure nodes** - Adjust settings like model, aspect ratio, or drawing tools
-4. **Run workflow** - Click the Run button to execute the pipeline
-5. **Save/Load** - Use the header menu to save or load workflows
+| Type | Purpose |
+|:-----|:--------|
+| **Image Input** | Load or upload reference images |
+| **Prompt** | Text prompt input |
+| **Generate** | AI image generation (multi-provider) |
+| **LLM** | AI text generation |
+| **Annotation** | Draw on images with full-screen editor |
+| **Split Grid** | Split image into grid cells |
+| **Audio** | AI audio/TTS generation |
+| **Output** | Display final result |
 
-## Connection Rules
+## Tech Stack
 
-- **Image** handles connect to **Image** handles only
-- **Text** handles connect to **Text** handles only
-- Image inputs on generation nodes accept multiple connections
-- Text inputs accept single connections
+<p>
+  <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white" alt="Next.js" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="https://reactflow.dev/"><img src="https://img.shields.io/badge/React%20Flow-FF0072?logo=react&logoColor=white" alt="React Flow" /></a>
+  <a href="https://konvajs.org/"><img src="https://img.shields.io/badge/Konva.js-0D83CD?logo=konva&logoColor=white" alt="Konva.js" /></a>
+  <a href="https://zustand-demo.pmnd.rs/"><img src="https://img.shields.io/badge/Zustand-443E38?logo=react&logoColor=white" alt="Zustand" /></a>
+  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwindcss-%2338B2AC.svg?logo=tailwind-css&logoColor=white" alt="TailwindCSS" /></a>
+</p>
 
 ## Testing
-
-Run the test suite with:
 
 ```bash
 npm test              # Watch mode
@@ -109,8 +132,23 @@ npm run test:run      # Single run
 npm run test:coverage # With coverage report
 ```
 
-## Contributions
-PRs are welcome, please pull the latest changes from develop before creating a PR and make it to the develop branch, not master. Not that I'm primarily making this for my own workflows, if the PR conflicts with my own plans I'll politely reject it. If you want to collaborate, consider joining the Discord and we can hash something out. 
+## Contributing
+
+PRs are welcome! Please branch from `develop` and target `develop` with your PR.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request targeting `develop`
+
+Note: This is primarily built for my own workflows. If a PR conflicts with my plans I'll politely decline. For larger contributions, join the [Discord](https://discord.com/invite/89Nr6EKkTf) to coordinate.
+
+## Community
+
+- **[Discord](https://discord.com/invite/89Nr6EKkTf)** — Chat, get help, and share workflows
+- **[Documentation](https://node-banana-docs.vercel.app/)** — Guides and reference
+- **[GitHub Issues](https://github.com/williavs/node-banana/issues)** — Report bugs and request features
 
 ## License
 
