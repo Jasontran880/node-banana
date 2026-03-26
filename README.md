@@ -2,7 +2,7 @@
 
 <img width="full" alt="Node Banana" src="public/node-banana.png" />
 
-### The Visual Workflow Editor for AI Image Generation
+### The Visual Workflow Editor for AI Media Generation
 
 [![GitHub stars](https://img.shields.io/github/stars/shrimbly/node-banana?style=flat&logo=github)](https://github.com/shrimbly/node-banana/stargazers)
 [![License](https://img.shields.io/github/license/shrimbly/node-banana?style=flat)](LICENSE)
@@ -23,23 +23,28 @@ Multi-provider support. Prompt-to-workflow generation. Built mainly with Claude.
 
 ## Build Complex AI Pipelines Visually
 
-Node Banana is a node-based workflow editor for AI image generation. Drag nodes onto an infinite canvas, connect them with typed handles, and execute pipelines that call AI APIs in dependency order.
+Node Banana is a node-based workflow editor for AI media generation. Drag nodes onto an infinite canvas, connect them with typed handles, and execute pipelines that call AI APIs in dependency order.
 
+- **Build dynamic prompts** with variables, LLM-powered text construction, and reusable prompt chains
 - **Generate workflows from natural language** or choose from preset templates
 - **Chain multiple AI models together** across providers in a single pipeline
+- **Generate images, video, 3D models, and audio** from a single workflow
 - **Annotate and edit images** with a full-screen drawing editor
-- **Lock node groups** to skip them during execution
 - **Save and share workflows** as portable JSON files
 
 ## Features
 
 | Feature | Description |
 |:--------|:------------|
+| **Dynamic Prompting** | Build prompts with variables, LLM-powered text construction, and reusable prompt chains that adapt per run |
 | **Prompt to Workflow** | Generate complete workflows from natural language descriptions |
 | **Visual Node Editor** | Drag-and-drop nodes onto an infinite canvas with pan and zoom |
+| **Image Generation** | Generate images using Google Gemini, Replicate, fal.ai, Kie.ai, and more |
+| **Video Generation** | Generate and trim video clips via Kie.ai (Sora, Veo, Kling) and other providers |
+| **Audio Generation** | Text-to-speech and AI audio generation |
+| **3D Models** | Load and display GLB models as node inputs |
 | **Image Annotation** | Full-screen editor with drawing tools (rectangles, circles, arrows, freehand, text) |
-| **AI Image Generation** | Generate images using Google Gemini, Replicate, fal.ai, Kie.ai, and more |
-| **Text Generation** | Generate text using Google Gemini or OpenAI models |
+| **Text Generation** | Generate text using Google Gemini, OpenAI, or Anthropic models |
 | **Workflow Chaining** | Connect multiple nodes to create complex multi-step pipelines |
 | **Group Locking** | Lock node groups to skip them during execution |
 | **Save/Load** | Export and import workflows as JSON files |
@@ -111,10 +116,12 @@ The `/examples` directory contains example workflow files. To try them:
 | **Image Input** | Load or upload reference images |
 | **Prompt** | Text prompt input |
 | **Generate** | AI image generation (multi-provider) |
+| **Video** | AI video generation and trimming |
 | **LLM** | AI text generation |
 | **Annotation** | Draw on images with full-screen editor |
 | **Split Grid** | Split image into grid cells |
 | **Audio** | AI audio/TTS generation |
+| **GLB Viewer** | Load and display 3D GLB models |
 | **Output** | Display final result |
 
 ## Tech Stack
