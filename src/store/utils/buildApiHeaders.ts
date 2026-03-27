@@ -16,6 +16,7 @@ const PROVIDER_HEADER_MAP: Record<ProviderType, string> = {
   fal: "X-Fal-API-Key",
   kie: "X-Kie-Key",
   wavespeed: "X-WaveSpeed-Key",
+  muapi: "X-Muapi-Key",
   openai: "X-OpenAI-API-Key",
   anthropic: "X-Anthropic-API-Key",
 };

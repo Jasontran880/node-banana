@@ -579,6 +579,28 @@ function extractParametersFromSchema(
 }
 
 /**
+ * Get hardcoded schema for mu-api models
+ */
+function getMuapiSchema(modelId: string): ExtractedSchema {
+  const schemas: Record<string, ExtractedSchema> = {
+    "seedance-v2.0-i2v": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio (reference image aspect ratio takes precedence)", enum: ["16:9", "9:16", "4:3", "3:4"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds", enum: [5, 10, 15], default: 5 },
+        { name: "quality", type: "string", description: "Output quality. basic=$0.08/sec, high=$0.15/sec", enum: ["basic", "high"], default: "basic" },
+        { name: "remove_watermark", type: "boolean", description: "Remove watermark from generated video", default: false },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "images_list", type: "image", required: true, label: "Image", isArray: true },
+      ],
+    },
+  };
+
+  return schemas[modelId] || { parameters: [], inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }] };
+}
+
+/**
  * Get hardcoded schema for Kie.ai models
  * Kie.ai doesn't have a schema discovery API, so we define these manually
  */
@@ -1170,7 +1192,7 @@ export async function GET(
   const decodedModelId = decodeURIComponent(modelId);
   const provider = request.nextUrl.searchParams.get("provider") as ProviderType | null;
 
-  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini")) {
+  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini" && provider !== "muapi")) {
     return NextResponse.json<SchemaErrorResponse>(
       {
         success: false,
@@ -1217,6 +1239,9 @@ export async function GET(
         );
       }
       result = await fetchReplicateSchema(decodedModelId, apiKey);
+    } else if (provider === "muapi") {
+      // mu-api uses hardcoded schemas (no schema discovery API)
+      result = getMuapiSchema(decodedModelId);
     } else if (provider === "kie") {
       // Kie.ai uses hardcoded schemas (no schema discovery API)
       result = getKieSchema(decodedModelId);
