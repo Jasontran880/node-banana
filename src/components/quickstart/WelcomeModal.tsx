@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { WorkflowFile } from "@/store/workflowStore";
 import { QuickstartView } from "@/types/quickstart";
 import { QuickstartInitialView } from "./QuickstartInitialView";
@@ -8,7 +8,7 @@ import { TemplateExplorerView } from "./TemplateExplorerView";
 import { PromptWorkflowView } from "./PromptWorkflowView";
 
 interface WelcomeModalProps {
-  onWorkflowGenerated: (workflow: WorkflowFile) => void;
+  onWorkflowGenerated: (workflow: WorkflowFile, directoryPath?: string) => void;
   onClose: () => void;
   onNewProject: () => void;
 }
@@ -19,7 +19,6 @@ export function WelcomeModal({
   onNewProject,
 }: WelcomeModalProps) {
   const [currentView, setCurrentView] = useState<QuickstartView>("initial");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleNewProject = useCallback(() => {
     onNewProject();
@@ -33,37 +32,35 @@ export function WelcomeModal({
     setCurrentView("vibe");
   }, []);
 
-  const handleSelectLoad = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+  const handleSelectLoad = useCallback(async () => {
+    try {
+      const browseRes = await fetch("/api/browse-directory");
+      const browseResult = await browseRes.json();
 
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const workflow = JSON.parse(
-            event.target?.result as string
-          ) as WorkflowFile;
-          if (workflow.version && workflow.nodes && workflow.edges) {
-            onWorkflowGenerated(workflow);
-          } else {
-            alert("Invalid workflow file format");
-          }
-        } catch {
-          alert("Failed to parse workflow file");
+      if (!browseResult.success || browseResult.cancelled || !browseResult.path) {
+        if (!browseResult.success && !browseResult.cancelled) {
+          alert(browseResult.error || "Failed to open directory picker");
         }
-      };
-      reader.readAsText(file);
+        return;
+      }
 
-      // Reset input so same file can be loaded again
-      e.target.value = "";
-    },
-    [onWorkflowGenerated]
-  );
+      const dirPath = browseResult.path;
+
+      const loadRes = await fetch(`/api/workflow?path=${encodeURIComponent(dirPath)}&load=true`);
+      const loadResult = await loadRes.json();
+
+      if (!loadResult.success) {
+        alert(loadResult.error || "No workflow file found in directory");
+        return;
+      }
+
+      const workflow = loadResult.workflow as WorkflowFile;
+      onWorkflowGenerated(workflow, dirPath);
+    } catch (error) {
+      console.error("Failed to open workflow:", error);
+      alert("Failed to open workflow. Please try again.");
+    }
+  }, [onWorkflowGenerated]);
 
   const handleBack = useCallback(() => {
     setCurrentView("initial");
@@ -107,14 +104,6 @@ export function WelcomeModal({
             onWorkflowGenerated={handleWorkflowSelected}
           />
         )}
-        {/* Hidden file input for loading workflows */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept=".json"
-          className="hidden"
-        />
       </div>
     </div>
   );

@@ -1933,8 +1933,8 @@ export function WorkflowCanvas() {
       {/* Welcome Modal */}
       {showQuickstart && (
         <WelcomeModal
-          onWorkflowGenerated={async (workflow) => {
-            await loadWorkflow(workflow);
+          onWorkflowGenerated={async (workflow, directoryPath) => {
+            await loadWorkflow(workflow, directoryPath);
             setShowQuickstart(false);
           }}
           onClose={() => setShowQuickstart(false)}
