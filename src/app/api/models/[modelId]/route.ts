@@ -601,6 +601,31 @@ function getMuapiSchema(modelId: string): ExtractedSchema {
 }
 
 /**
+ * Get hardcoded schema for Higgsfield models
+ * Higgsfield doesn't have a schema discovery API, so we define these manually
+ */
+function getHiggsfieldSchema(modelId: string): ExtractedSchema {
+  const schemas: Record<string, ExtractedSchema> = {
+    "soul-standard": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["9:16", "16:9", "4:3", "3:4", "1:1", "2:3", "3:2"], default: "4:3" },
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["720p", "1080p"], default: "720p" },
+        { name: "batch_size", type: "integer", description: "Number of images to generate (1 or 4)", enum: [1, 4], default: 1 },
+        { name: "enhance_prompt", type: "boolean", description: "Auto-enhance the prompt before generation", default: true },
+        { name: "seed", type: "integer", description: "Reproducibility seed (1–1000000). Leave empty for random.", minimum: 1, maximum: 1000000 },
+        { name: "style_id", type: "string", description: "Soul Style UUID to apply (get IDs from Higgsfield /v1/text2image/soul-styles)" },
+        { name: "style_strength", type: "number", description: "Strength of the applied style (0–1)", default: 1, minimum: 0, maximum: 1 },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+      ],
+    },
+  };
+
+  return schemas[modelId] || { parameters: [], inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }] };
+}
+
+/**
  * Get hardcoded schema for Kie.ai models
  * Kie.ai doesn't have a schema discovery API, so we define these manually
  */
@@ -1192,11 +1217,11 @@ export async function GET(
   const decodedModelId = decodeURIComponent(modelId);
   const provider = request.nextUrl.searchParams.get("provider") as ProviderType | null;
 
-  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini" && provider !== "muapi")) {
+  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini" && provider !== "muapi" && provider !== "higgsfield")) {
     return NextResponse.json<SchemaErrorResponse>(
       {
         success: false,
-        error: "Invalid or missing provider. Use ?provider=replicate, ?provider=fal, ?provider=kie, ?provider=wavespeed, or ?provider=gemini",
+        error: "Invalid or missing provider. Use ?provider=replicate, ?provider=fal, ?provider=kie, ?provider=wavespeed, ?provider=gemini, or ?provider=higgsfield",
       },
       { status: 400 }
     );
@@ -1242,6 +1267,9 @@ export async function GET(
     } else if (provider === "muapi") {
       // mu-api uses hardcoded schemas (no schema discovery API)
       result = getMuapiSchema(decodedModelId);
+    } else if (provider === "higgsfield") {
+      // Higgsfield uses hardcoded schemas (no schema discovery API)
+      result = getHiggsfieldSchema(decodedModelId);
     } else if (provider === "kie") {
       // Kie.ai uses hardcoded schemas (no schema discovery API)
       result = getKieSchema(decodedModelId);

@@ -2314,10 +2314,12 @@ export function useProviderApiKeys() {
       kieApiKey: state.providerSettings.providers.kie?.apiKey ?? null,
       wavespeedApiKey: state.providerSettings.providers.wavespeed?.apiKey ?? null,
       muapiApiKey: state.providerSettings.providers.muapi?.apiKey ?? null,
+      higgsfieldApiKey: state.providerSettings.providers.higgsfield?.apiKey ?? null,
       // Provider enabled states (for conditional UI)
       replicateEnabled: state.providerSettings.providers.replicate?.enabled ?? false,
       kieEnabled: state.providerSettings.providers.kie?.enabled ?? false,
       muapiEnabled: state.providerSettings.providers.muapi?.enabled ?? false,
+      higgsfieldEnabled: state.providerSettings.providers.higgsfield?.enabled ?? false,
     }))
   );
 }

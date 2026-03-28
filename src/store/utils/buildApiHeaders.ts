@@ -17,6 +17,7 @@ const PROVIDER_HEADER_MAP: Record<ProviderType, string> = {
   kie: "X-Kie-Key",
   wavespeed: "X-WaveSpeed-Key",
   muapi: "X-Muapi-Key",
+  higgsfield: "X-Higgsfield-Key",
   openai: "X-OpenAI-API-Key",
   anthropic: "X-Anthropic-API-Key",
 };

@@ -19,6 +19,7 @@ import { clearFalInputMappingCache as _clearFalInputMappingCache, generateWithFa
 import { generateWithKie } from "./providers/kie";
 import { generateWithWaveSpeed } from "./providers/wavespeed";
 import { generateWithMuapi } from "./providers/muapi";
+import { generateWithHighsfield } from "./providers/higgsfield";
 
 // Re-export for backward compatibility (test file imports from route)
 export const clearFalInputMappingCache = _clearFalInputMappingCache;
@@ -433,6 +434,61 @@ export async function POST(request: NextRequest) {
       }
 
       // Return first output
+      const output = result.outputs?.[0];
+      if (!output?.data && !output?.url) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "No output in generation result" },
+          { status: 500 }
+        );
+      }
+
+      return buildMediaResponse(output);
+    }
+
+    if (provider === "higgsfield") {
+      if (!selectedModel?.modelId || !selectedModel?.displayName) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "selectedModel with modelId and displayName is required for Higgsfield" },
+          { status: 400 }
+        );
+      }
+
+      const higgsfieldApiKey = request.headers.get("X-Higgsfield-Key") || process.env.HIGGSFIELD_API_KEY;
+      if (!higgsfieldApiKey) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: "Higgsfield API key not configured. Add HIGGSFIELD_API_KEY=key:secret to .env.local or configure in Settings.",
+          },
+          { status: 401 }
+        );
+      }
+
+      const genInput: GenerationInput = {
+        model: {
+          id: selectedModel.modelId,
+          name: selectedModel.displayName,
+          provider: "higgsfield",
+          capabilities: capabilitiesForMediaType(mediaType),
+          description: null,
+        },
+        prompt: prompt || "",
+        images: [],
+        parameters,
+      };
+
+      const result = await generateWithHighsfield(requestId, higgsfieldApiKey, genInput);
+
+      if (!result.success) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: result.error || "Generation failed",
+          },
+          { status: 500 }
+        );
+      }
+
       const output = result.outputs?.[0];
       if (!output?.data && !output?.url) {
         return NextResponse.json<GenerateResponse>(

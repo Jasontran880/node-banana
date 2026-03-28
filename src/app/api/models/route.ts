@@ -440,6 +440,20 @@ const MUAPI_MODELS: ProviderModel[] = [
   },
 ];
 
+// Higgsfield models (hardcoded)
+const HIGGSFIELD_MODELS: ProviderModel[] = [
+  {
+    id: "soul-standard",
+    name: "Soul Standard",
+    description: "Higgsfield Soul Standard text-to-image. Cinematic, portrait-focused generation with style presets, aspect ratio and resolution control.",
+    provider: "higgsfield",
+    capabilities: ["text-to-image"],
+    coverImage: undefined,
+    pricing: undefined,
+    pageUrl: "https://platform.higgsfield.ai",
+  },
+];
+
 // WaveSpeed models are now fetched dynamically from https://api.wavespeed.ai/api/v3/models
 
 // ============ Replicate Types ============
@@ -968,6 +982,7 @@ export async function GET(
   const kieKey = request.headers.get("X-Kie-Key") || process.env.KIE_API_KEY || null;
   const wavespeedKey = request.headers.get("X-WaveSpeed-Key") || process.env.WAVESPEED_API_KEY || null;
   const muapiKey = request.headers.get("X-Muapi-Key") || process.env.MUAPI_API_KEY || null;
+  const higgsfieldKey = request.headers.get("X-Higgsfield-Key") || process.env.HIGGSFIELD_API_KEY || null;
 
   // Build list of all available providers (have keys from env or client headers)
   const availableProviders: string[] = ["gemini"]; // Gemini always available
@@ -976,12 +991,14 @@ export async function GET(
   if (kieKey) availableProviders.push("kie");
   if (wavespeedKey) availableProviders.push("wavespeed");
   if (muapiKey) availableProviders.push("muapi");
+  if (higgsfieldKey) availableProviders.push("higgsfield");
 
   // Determine which providers to fetch from (excluding gemini/kie - handled separately as hardcoded)
   const providersToFetch: ProviderType[] = [];
   let includeGemini = false;
   let includeKie = false;
   let includeMuapi = false;
+  let includeHighsfield = false;
 
   if (providerFilter) {
     if (providerFilter === "gemini") {
@@ -1027,6 +1044,18 @@ export async function GET(
           { status: 400 }
         );
       }
+    } else if (providerFilter === "higgsfield") {
+      if (higgsfieldKey) {
+        includeHighsfield = true;
+      } else {
+        return NextResponse.json<ModelsErrorResponse>(
+          {
+            success: false,
+            error: "Higgsfield API key required. Add HIGGSFIELD_API_KEY to .env.local or configure in Settings.",
+          },
+          { status: 400 }
+        );
+      }
     } else if (providerFilter === "replicate" && replicateKey) {
       providersToFetch.push("replicate");
     } else if (providerFilter === "fal" && falKey) {
@@ -1037,6 +1066,7 @@ export async function GET(
     includeGemini = true; // Gemini always available
     includeKie = kieKey ? true : false; // Kie only if API key is configured
     includeMuapi = muapiKey ? true : false; // mu-api only if API key is configured
+    includeHighsfield = higgsfieldKey ? true : false; // Higgsfield only if API key is configured
     if (wavespeedKey) {
       providersToFetch.push("wavespeed"); // WaveSpeed if key is configured
     }
@@ -1049,7 +1079,7 @@ export async function GET(
   }
 
   // Gemini and Kie are always available (with key for Kie), so we don't fail if no external providers
-  if (providersToFetch.length === 0 && !includeGemini && !includeKie && !includeMuapi) {
+  if (providersToFetch.length === 0 && !includeGemini && !includeKie && !includeMuapi && !includeHighsfield) {
     return NextResponse.json<ModelsErrorResponse>(
       {
         success: false,
@@ -1108,6 +1138,21 @@ export async function GET(
     providerResults["muapi"] = {
       success: true,
       count: muapiModels.length,
+      cached: true,
+    };
+    anyFromCache = true;
+  }
+
+  // Add Higgsfield models if included (hardcoded, no API call needed)
+  if (includeHighsfield) {
+    let higgsfieldModels = HIGGSFIELD_MODELS;
+    if (searchQuery) {
+      higgsfieldModels = filterModelsBySearch(higgsfieldModels, searchQuery);
+    }
+    allModels.push(...higgsfieldModels);
+    providerResults["higgsfield"] = {
+      success: true,
+      count: higgsfieldModels.length,
       cached: true,
     };
     anyFromCache = true;
