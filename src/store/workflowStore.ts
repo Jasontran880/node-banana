@@ -373,6 +373,9 @@ interface WorkflowStore {
   // Switch dimming state
   dimmedNodeIds: Set<string>;
 
+  // Skip propagation state (optional empty inputs)
+  skippedNodeIds: Set<string>;
+
   // Switch dimming actions
   recomputeDimmedNodes: () => void;
 
@@ -506,6 +509,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
   // Switch dimming initial state
   dimmedNodeIds: new Set<string>(),
+
+  // Skip propagation initial state
+  skippedNodeIds: new Set<string>(),
 
   setEdgeStyle: (style: EdgeStyle) => {
     set({ edgeStyle: style });
@@ -1007,7 +1013,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         }
       }
     };
-    set({ isRunning: true, pausedAtNodeId: null, currentNodeIds: [], _abortController: abortController });
+    set({ isRunning: true, pausedAtNodeId: null, currentNodeIds: [], skippedNodeIds: new Set(), _abortController: abortController });
 
     // Start logging session
     await logger.startSession();
@@ -1089,6 +1095,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           (node.type === "prompt" && !(nodeData.prompt as string)?.trim());
         if (isEmpty) {
           skippedNodeIds.add(node.id);
+          set({ skippedNodeIds: new Set(skippedNodeIds) });
           logger.info('node.execution', 'Node skipped (optional input empty)', {
             nodeId: node.id,
             nodeType: node.type,
@@ -1102,6 +1109,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       const hasSkippedSource = incomingEdgesForSkip.some((e) => skippedNodeIds.has(e.source));
       if (hasSkippedSource) {
         skippedNodeIds.add(node.id);
+        set({ skippedNodeIds: new Set(skippedNodeIds) });
         if (nodeData.status !== undefined) {
           get().updateNodeData(node.id, { status: "skipped" } as Partial<WorkflowNodeData>);
         }
@@ -1257,7 +1265,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
       resetSkippedNodes();
 
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      set({ isRunning: false, currentNodeIds: [], skippedNodeIds: new Set(), _abortController: null });
 
       saveLogSession();
       await logger.endSession();
@@ -1274,7 +1282,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         );
       }
       resetSkippedNodes();
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      set({ isRunning: false, currentNodeIds: [], skippedNodeIds: new Set(), _abortController: null });
 
       saveLogSession();
       await logger.endSession();
@@ -1287,7 +1295,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     if (controller) {
       controller.abort("user-cancelled");
     }
-    set({ isRunning: false, currentNodeIds: [], _abortController: null });
+    set({ isRunning: false, currentNodeIds: [], skippedNodeIds: new Set(), _abortController: null });
   },
 
   setMaxConcurrentCalls: (value: number) => {
@@ -1822,6 +1830,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       viewedCommentNodeIds: new Set<string>(),
       // Reset dimmed nodes
       dimmedNodeIds: new Set<string>(),
+      // Reset skipped nodes
+      skippedNodeIds: new Set<string>(),
     });
     get().clearSnapshot();
   },
