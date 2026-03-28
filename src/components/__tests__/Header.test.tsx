@@ -24,6 +24,13 @@ vi.mock("@/components/ProjectSetupModal", () => ({
   ),
 }));
 
+// Mock WorkflowBrowserModal
+vi.mock("@/components/WorkflowBrowserModal", () => ({
+  WorkflowBrowserModal: ({ isOpen }: { isOpen: boolean }) => (
+    isOpen ? <div data-testid="workflow-browser-modal">Workflow Browser</div> : null
+  ),
+}));
+
 // Mock CostIndicator
 vi.mock("@/components/CostIndicator", () => ({
   CostIndicator: () => <div data-testid="cost-indicator">$0.00</div>,
@@ -250,18 +257,12 @@ describe("Header", () => {
       expect(openButton).toBeInTheDocument();
     });
 
-    it("should call browse-directory API when open button is clicked", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true, cancelled: true }),
-      });
-      global.fetch = mockFetch;
-
+    it("should open WorkflowBrowserModal when open button is clicked", () => {
       render(<Header />);
       const openButton = screen.getByTitle("Open project");
       fireEvent.click(openButton);
 
-      expect(mockFetch).toHaveBeenCalledWith("/api/browse-directory");
+      expect(screen.getByTestId("workflow-browser-modal")).toBeInTheDocument();
     });
   });
 
@@ -395,48 +396,6 @@ describe("Header", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: "/path/to/project" }),
-      });
-    });
-  });
-
-  describe("File Loading via Directory Picker", () => {
-    it("should not call loadWorkflow when directory picker is cancelled", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true, cancelled: true }),
-      });
-      global.fetch = mockFetch;
-
-      render(<Header />);
-      const openButton = screen.getByTitle("Open project");
-      fireEvent.click(openButton);
-
-      // Wait for the async handler to settle
-      await vi.waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith("/api/browse-directory");
-      });
-      expect(mockLoadWorkflow).not.toHaveBeenCalled();
-    });
-
-    it("should load workflow from selected directory", async () => {
-      const mockWorkflow = { version: "1.0", nodes: [], edges: [], name: "Test" };
-      const mockFetch = vi.fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ success: true, path: "/path/to/project" }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ success: true, workflow: mockWorkflow, filename: "Test" }),
-        });
-      global.fetch = mockFetch;
-
-      render(<Header />);
-      const openButton = screen.getByTitle("Open project");
-      fireEvent.click(openButton);
-
-      await vi.waitFor(() => {
-        expect(mockLoadWorkflow).toHaveBeenCalledWith(mockWorkflow, "/path/to/project");
       });
     });
   });
