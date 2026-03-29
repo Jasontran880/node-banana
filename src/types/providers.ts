@@ -36,7 +36,7 @@ export interface ProviderSettings {
 }
 
 // LLM Provider Options
-export type LLMProvider = "google" | "openai" | "anthropic";
+export type LLMProvider = "google" | "openai" | "anthropic" | "kie";
 
 // LLM Model Options
 export type LLMModelType =
@@ -48,7 +48,10 @@ export type LLMModelType =
   | "gpt-4.1-nano"
   | "claude-opus-4.6"
   | "claude-sonnet-4.5"
-  | "claude-haiku-4.5";
+  | "claude-haiku-4.5"
+  | "kie-claude-opus-4.6"
+  | "kie-claude-sonnet-4.6"
+  | "kie-gpt-5.4";
 
 // Recently used models tracking
 export interface RecentModel {

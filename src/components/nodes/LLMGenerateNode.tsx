@@ -13,6 +13,7 @@ const LLM_PROVIDERS: { value: LLMProvider; label: string }[] = [
   { value: "google", label: "Google" },
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
+  { value: "kie", label: "Kie.ai" },
 ];
 
 const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> = {
@@ -30,6 +31,11 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
     { value: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
     { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
+  ],
+  kie: [
+    { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
+    { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "kie-gpt-5.4", label: "GPT 5.4" },
   ],
 };
 
@@ -83,7 +89,7 @@ export function LLMGenerateNode({ id, data, selected }: NodeProps<LLMGenerateNod
         provider: newProvider,
         model: firstModelForProvider,
       };
-      if (newProvider === "anthropic" && (nodeData.temperature ?? 0.7) > 1) {
+      if ((newProvider === "anthropic" || newProvider === "kie") && (nodeData.temperature ?? 0.7) > 1) {
         updates.temperature = 1;
       }
       updateNodeData(id, updates);
@@ -167,7 +173,7 @@ export function LLMGenerateNode({ id, data, selected }: NodeProps<LLMGenerateNod
               <input
                 type="range"
                 min="0"
-                max={provider === "anthropic" ? "1" : "2"}
+                max={provider === "anthropic" || provider === "kie" ? "1" : "2"}
                 step="0.01"
                 value={nodeData.temperature ?? 0.7}
                 onChange={handleTemperatureChange}
