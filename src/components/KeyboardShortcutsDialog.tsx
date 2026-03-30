@@ -22,6 +22,8 @@ const shortcutGroups: ShortcutGroup[] = [
       { keys: [`${modKey}`, "Enter"], description: "Run workflow" },
       { keys: [`${modKey}`, "C"], description: "Copy selected nodes" },
       { keys: [`${modKey}`, "V"], description: "Paste nodes / image / text" },
+      { keys: [`${modKey}`, "Z"], description: "Undo" },
+      { keys: [`${modKey}`, "Shift", "Z"], description: "Redo" },
       { keys: ["?"], description: "Show keyboard shortcuts" },
     ],
   },

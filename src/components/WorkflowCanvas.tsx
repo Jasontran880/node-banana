@@ -1311,6 +1311,8 @@ export function WorkflowCanvas() {
   const pasteNodes = useWorkflowStore((state) => state.pasteNodes);
   const clearClipboard = useWorkflowStore((state) => state.clearClipboard);
   const clipboard = useWorkflowStore((state) => state.clipboard);
+  const undo = useWorkflowStore((state) => state.undo);
+  const redo = useWorkflowStore((state) => state.redo);
 
   // Add non-passive wheel listener to handle zoom/pan and prevent browser navigation
   // This replaces the onWheel prop which is passive by default and can't preventDefault
@@ -1415,6 +1417,20 @@ export function WorkflowCanvas() {
     if ((event.ctrlKey || event.metaKey) && event.key === "c") {
       event.preventDefault();
       copySelectedNodes();
+      return;
+    }
+
+    // Handle undo (Ctrl/Cmd + Z)
+    if ((event.ctrlKey || event.metaKey) && event.key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      undo();
+      return;
+    }
+
+    // Handle redo (Ctrl/Cmd + Shift + Z)
+    if ((event.ctrlKey || event.metaKey) && event.key === "z" && event.shiftKey) {
+      event.preventDefault();
+      redo();
       return;
     }
 
@@ -1667,7 +1683,7 @@ export function WorkflowCanvas() {
           ]);
         });
       }
-  }, [nodes, onNodesChange, copySelectedNodes, pasteNodes, clearClipboard, clipboard, getViewport, addNode, updateNodeData, executeWorkflow, setShortcutsDialogOpen]);
+  }, [nodes, onNodesChange, copySelectedNodes, pasteNodes, clearClipboard, clipboard, getViewport, addNode, updateNodeData, executeWorkflow, setShortcutsDialogOpen, undo, redo]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);

@@ -26,6 +26,7 @@ import {
   MatchMode,
   MODEL_DISPLAY_NAMES,
 } from "@/types";
+import { UndoManager, UndoSnapshot } from "./undoHistory";
 import { useToast } from "@/components/Toast";
 import { logger } from "@/utils/logger";
 import { externalizeWorkflowMedia, hydrateWorkflowMedia } from "@/utils/mediaStorage";
@@ -208,6 +209,12 @@ interface WorkflowStore {
   clipboard: ClipboardData | null;
   groups: Record<string, NodeGroup>;
 
+  // Undo/Redo
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+
   // Settings
   setEdgeStyle: (style: EdgeStyle) => void;
 
@@ -385,6 +392,12 @@ let nodeIdCounter = 0;
 let groupIdCounter = 0;
 let autoSaveIntervalId: ReturnType<typeof setInterval> | null = null;
 
+// Undo/redo state (module-level, not in Zustand to avoid serialization)
+const undoManager = new UndoManager();
+let isDragging = false;
+let pendingDataSnapshot: UndoSnapshot | null = null;
+let dataChangeTimer: ReturnType<typeof setTimeout> | null = null;
+
 // RAF debounce for hover updates — coalesces rapid mouseenter/mouseleave events
 // into a single store update per animation frame
 let hoverRafId: number | null = null;
@@ -450,6 +463,45 @@ function clearStaleInputImages(
   }
 }
 
+/** Capture current undoable state as a deep-cloned snapshot */
+function captureUndoSnapshot(state: WorkflowStore): UndoSnapshot {
+  const cloned = JSON.parse(JSON.stringify({
+    nodes: state.nodes,
+    edges: state.edges,
+    groups: state.groups,
+    edgeStyle: state.edgeStyle,
+  })) as UndoSnapshot;
+  // Strip transient selection state from cloned nodes
+  for (const node of cloned.nodes) {
+    delete (node as Record<string, unknown>).selected;
+  }
+  return cloned;
+}
+
+/** Flush pending debounced data snapshot, capture current state, push to undoManager */
+function pushUndoCheckpoint(
+  get: () => WorkflowStore,
+  set: (partial: Partial<WorkflowStore>) => void,
+): void {
+  // Flush any pending debounced data snapshot first
+  if (pendingDataSnapshot) {
+    undoManager.push(pendingDataSnapshot);
+    pendingDataSnapshot = null;
+    if (dataChangeTimer) {
+      clearTimeout(dataChangeTimer);
+      dataChangeTimer = null;
+    }
+  }
+  const snapshot = captureUndoSnapshot(get());
+  undoManager.push(snapshot);
+  set({ canUndo: undoManager.canUndo, canRedo: undoManager.canRedo });
+}
+
+/** Update reactive canUndo/canRedo flags */
+function syncUndoFlags(set: (partial: Partial<WorkflowStore>) => void): void {
+  set({ canUndo: undoManager.canUndo, canRedo: undoManager.canRedo });
+}
+
 const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   nodes: [],
   edges: [],
@@ -513,7 +565,58 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   // Skip propagation initial state
   skippedNodeIds: new Set<string>(),
 
+  // Undo/Redo initial state
+  canUndo: false,
+  canRedo: false,
+
+  undo: () => {
+    // Discard any pending debounced data snapshot — it's intermediate state
+    if (pendingDataSnapshot) {
+      pendingDataSnapshot = null;
+      if (dataChangeTimer) {
+        clearTimeout(dataChangeTimer);
+        dataChangeTimer = null;
+      }
+    }
+    const current = captureUndoSnapshot(get());
+    const previous = undoManager.undo(current);
+    if (previous) {
+      set({
+        nodes: previous.nodes,
+        edges: previous.edges,
+        groups: previous.groups,
+        edgeStyle: previous.edgeStyle,
+        hasUnsavedChanges: true,
+      });
+    }
+    syncUndoFlags(set);
+  },
+
+  redo: () => {
+    // Discard any pending debounced data snapshot
+    if (pendingDataSnapshot) {
+      pendingDataSnapshot = null;
+      if (dataChangeTimer) {
+        clearTimeout(dataChangeTimer);
+        dataChangeTimer = null;
+      }
+    }
+    const current = captureUndoSnapshot(get());
+    const next = undoManager.redo(current);
+    if (next) {
+      set({
+        nodes: next.nodes,
+        edges: next.edges,
+        groups: next.groups,
+        edgeStyle: next.edgeStyle,
+        hasUnsavedChanges: true,
+      });
+    }
+    syncUndoFlags(set);
+  },
+
   setEdgeStyle: (style: EdgeStyle) => {
+    pushUndoCheckpoint(get, set);
     set({ edgeStyle: style });
   },
 
@@ -562,6 +665,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       style: { width, height },
     };
 
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       nodes: [...state.nodes, newNode],
       hasUnsavedChanges: true,
@@ -574,6 +678,23 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
   updateNodeData: (nodeId: string, data: Partial<WorkflowNodeData>) => {
     const node = get().nodes.find((n) => n.id === nodeId);
+
+    // Debounced undo tracking: skip during execution
+    if (!get().isRunning) {
+      if (!pendingDataSnapshot) {
+        pendingDataSnapshot = captureUndoSnapshot(get());
+      }
+      if (dataChangeTimer) clearTimeout(dataChangeTimer);
+      dataChangeTimer = setTimeout(() => {
+        if (pendingDataSnapshot) {
+          undoManager.push(pendingDataSnapshot);
+          pendingDataSnapshot = null;
+          syncUndoFlags(set);
+        }
+        dataChangeTimer = null;
+      }, 500);
+    }
+
     set((state) => ({
       nodes: state.nodes.map((node) =>
         node.id === nodeId
@@ -592,6 +713,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   removeNode: (nodeId: string) => {
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       nodes: state.nodes.filter((node) => node.id !== nodeId),
       edges: state.edges.filter(
@@ -610,6 +732,26 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     // Track manual changes only for remove operations (not position/selection/dimensions)
     const hasRemoveChange = changes.some((c) => c.type === "remove");
 
+    // Undo: capture snapshot on drag start
+    const hasDragStart = changes.some(
+      (c) => c.type === "position" && (c as { dragging?: boolean }).dragging === true
+    );
+    const hasDragEnd = changes.some(
+      (c) => c.type === "position" && (c as { dragging?: boolean }).dragging === false
+    );
+    if (hasDragStart && !isDragging) {
+      isDragging = true;
+      pushUndoCheckpoint(get, set);
+    }
+    if (hasDragEnd && isDragging) {
+      isDragging = false;
+    }
+
+    // Undo: capture snapshot before node removal
+    if (hasRemoveChange) {
+      pushUndoCheckpoint(get, set);
+    }
+
     set((state) => ({
       nodes: applyNodeChanges(changes, state.nodes),
       ...(hasMeaningfulChange ? { hasUnsavedChanges: true } : {}),
@@ -626,6 +768,11 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     // Track manual changes only for remove operations (not selection)
     const hasRemoveChange = changes.some((c) => c.type === "remove");
     const hasAddOrRemove = changes.some((c) => c.type === "add" || c.type === "remove");
+
+    // Undo: capture snapshot before edge removal
+    if (hasRemoveChange) {
+      pushUndoCheckpoint(get, set);
+    }
 
     // Capture removed edges before applyEdgeChanges removes them
     let removedEdges: WorkflowEdge[] = [];
@@ -653,6 +800,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   onConnect: (connection: Connection, edgeDataOverrides?: Record<string, unknown>) => {
+    pushUndoCheckpoint(get, set);
     set((state) => {
       const baseData = buildConnectionEdgeData(connection, state.nodes, state.edges);
       const newEdge = {
@@ -671,6 +819,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   addEdgeWithType: (connection: Connection, edgeType: string, edgeDataOverrides?: Record<string, unknown>) => {
+    pushUndoCheckpoint(get, set);
     set((state) => {
       const baseData = buildConnectionEdgeData(connection, state.nodes, state.edges);
       const newEdge = {
@@ -687,6 +836,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   removeEdge: (edgeId: string) => {
+    pushUndoCheckpoint(get, set);
     const removedEdge = get().edges.find((e) => e.id === edgeId);
     set((state) => ({
       edges: state.edges.filter((edge) => edge.id !== edgeId),
@@ -697,6 +847,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   toggleEdgePause: (edgeId: string) => {
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       edges: state.edges.map((edge) =>
         edge.id === edgeId
@@ -731,6 +882,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     const { clipboard, nodes, edges } = get();
 
     if (!clipboard || clipboard.nodes.length === 0) return;
+
+    pushUndoCheckpoint(get, set);
 
     // Create a mapping from old node IDs to new node IDs
     const idMapping = new Map<string, string>();
@@ -807,6 +960,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
     if (nodeIds.length === 0) return "";
 
+    pushUndoCheckpoint(get, set);
+
     // Get the nodes to group
     const nodesToGroup = nodes.filter((n) => nodeIds.includes(n.id));
     if (nodesToGroup.length === 0) return "";
@@ -870,6 +1025,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   deleteGroup: (groupId: string) => {
+    pushUndoCheckpoint(get, set);
     set((state) => {
       const { [groupId]: _, ...remainingGroups } = state.groups;
       return {
@@ -883,6 +1039,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   addNodesToGroup: (nodeIds: string[], groupId: string) => {
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       nodes: state.nodes.map((node) =>
         nodeIds.includes(node.id) ? { ...node, groupId } : node
@@ -892,6 +1049,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   removeNodesFromGroup: (nodeIds: string[]) => {
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       nodes: state.nodes.map((node) =>
         nodeIds.includes(node.id) ? { ...node, groupId: undefined } : node
@@ -901,6 +1059,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   updateGroup: (groupId: string, updates: Partial<NodeGroup>) => {
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       groups: {
         ...state.groups,
@@ -911,6 +1070,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   toggleGroupLock: (groupId: string) => {
+    pushUndoCheckpoint(get, set);
     set((state) => ({
       groups: {
         ...state.groups,
@@ -1812,6 +1972,10 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       get().clearSnapshot();
     }
 
+    // Clear undo history — loading a workflow is a fresh start
+    undoManager.clear();
+    syncUndoFlags(set);
+
     // Recompute dimming after loading workflow
     get().recomputeDimmedNodes();
   },
@@ -1842,6 +2006,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       skippedNodeIds: new Set<string>(),
     });
     get().clearSnapshot();
+    // Clear undo history
+    undoManager.clear();
+    syncUndoFlags(set);
   },
 
   addToGlobalHistory: (item: Omit<ImageHistoryItem, "id">) => {
