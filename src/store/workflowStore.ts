@@ -26,7 +26,7 @@ import {
   MatchMode,
   MODEL_DISPLAY_NAMES,
 } from "@/types";
-import { UndoManager, UndoSnapshot } from "./undoHistory";
+import { UndoManager, UndoSnapshot, clonePreservingStrings } from "./undoHistory";
 import { useToast } from "@/components/Toast";
 import { logger } from "@/utils/logger";
 import { externalizeWorkflowMedia, hydrateWorkflowMedia } from "@/utils/mediaStorage";
@@ -474,12 +474,12 @@ function clearStaleInputImages(
 
 /** Capture current undoable state as a deep-cloned snapshot */
 function captureUndoSnapshot(state: WorkflowStore): UndoSnapshot {
-  const cloned = JSON.parse(JSON.stringify({
+  const cloned = clonePreservingStrings({
     nodes: state.nodes,
     edges: state.edges,
     groups: state.groups,
     edgeStyle: state.edgeStyle,
-  })) as UndoSnapshot;
+  }) as UndoSnapshot;
   // Strip transient selection state from cloned nodes
   for (const node of cloned.nodes) {
     delete (node as Record<string, unknown>).selected;
