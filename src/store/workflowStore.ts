@@ -85,6 +85,7 @@ import {
   executeRouter,
   executeSwitch,
   executeConditionalSwitch,
+  runBatchIfApplicable,
 } from "./execution";
 import type { NodeExecutionContext } from "./execution";
 export type { LevelGroup } from "./utils/executionUtils";
@@ -1322,73 +1323,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       const executionCtx = get()._buildExecutionContext(node, signal);
 
       // Batch mode: for generate-type nodes, detect textItems and loop through them
-      const batchNodeTypes = new Set(["nanoBanana", "generateVideo", "generateAudio", "llmGenerate"]);
-      if (node.type && batchNodeTypes.has(node.type)) {
-        const connectedInputs = get().getConnectedInputs(node.id);
-        if (connectedInputs.textItems.length > 0) {
-          const items = connectedInputs.textItems;
-          const totalItems = items.length;
-
-          for (let i = 0; i < totalItems; i++) {
-            // Check abort signal before each iteration
-            if (signal.aborted) {
-              throw new DOMException('Aborted', 'AbortError');
-            }
-
-            // Update status with batch progress
-            get().updateNodeData(node.id, {
-              status: "loading",
-              error: null,
-            } as Partial<WorkflowNodeData>);
-
-            logger.info('node.execution', `Batch ${i + 1} of ${totalItems}`, {
-              nodeId: node.id,
-              nodeType: node.type,
-              batchIndex: i,
-              batchTotal: totalItems,
-            });
-
-            // Create a wrapped context where getConnectedInputs returns
-            // the current item as `text` and clears `textItems`
-            const batchCtx: NodeExecutionContext = {
-              ...executionCtx,
-              getConnectedInputs: (nodeId: string) => {
-                const inputs = get().getConnectedInputs(nodeId);
-                return {
-                  ...inputs,
-                  text: items[i],
-                  textItems: [], // Clear so executors don't see batch
-                };
-              },
-            };
-
-            // Execute the appropriate executor
-            switch (node.type) {
-              case "nanoBanana":
-                await executeNanoBanana(batchCtx);
-                break;
-              case "generateVideo":
-                await executeGenerateVideo(batchCtx);
-                break;
-              case "generateAudio":
-                await executeGenerateAudio(batchCtx);
-                break;
-              case "llmGenerate":
-                await executeLlmGenerate(batchCtx);
-                break;
-            }
-
-            // After each iteration (except last), reset status to loading for next iteration
-            if (i < totalItems - 1) {
-              get().updateNodeData(node.id, {
-                status: "loading",
-              } as Partial<WorkflowNodeData>);
-            }
-          }
-
-          // Batch complete — skip the normal switch below
-          return;
-        }
+      if (await runBatchIfApplicable(executionCtx)) {
+        return;
       }
 
       switch (node.type) {
@@ -1605,7 +1541,12 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
       const regenOptions = { useStoredFallback: true };
 
-      if (node.type === "nanoBanana") {
+      // Try batch mode first (handles textItems from array nodes)
+      const wasBatch = await runBatchIfApplicable(executionCtx, regenOptions);
+
+      if (wasBatch) {
+        // Batch handled — skip to downstream execution
+      } else if (node.type === "nanoBanana") {
         await executeNanoBanana(executionCtx, regenOptions);
       } else if (node.type === "array") {
         await executeArray(executionCtx);
@@ -1737,6 +1678,11 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
       const executionCtx = get()._buildExecutionContext(node, signal);
       const regenOptions = { useStoredFallback: true };
+
+      // Try batch mode first (handles textItems from array nodes)
+      if (await runBatchIfApplicable(executionCtx, regenOptions)) {
+        return;
+      }
 
       switch (node.type) {
         case "imageInput":
