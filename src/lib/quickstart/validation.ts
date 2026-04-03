@@ -63,6 +63,7 @@ const DEFAULT_DIMENSIONS: Record<NodeType, { width: number; height: number }> = 
   router: { width: 200, height: 80 },
   switch: { width: 220, height: 120 },
   conditionalSwitch: { width: 260, height: 180 },
+  imageUpscaler: { width: 300, height: 300 },
   glbViewer: { width: 360, height: 380 },
 };
 

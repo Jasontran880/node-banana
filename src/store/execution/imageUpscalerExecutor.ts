@@ -95,9 +95,6 @@ export async function executeImageUpscaler(
 
       updateNodeData(node.id, { outputImage, status: "complete", error: null });
 
-      if (nodeData.upscaleFactor && providerSettings?.kiePricing) {
-        addIncurredCost(0);
-      }
 
       if (generationsPath) {
         const savePromise = fetch("/api/save-generation", {

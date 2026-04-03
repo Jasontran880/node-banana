@@ -72,6 +72,7 @@ import {
   executeImageCompare,
   executeNanoBanana,
   executeGenerateVideo,
+  executeImageUpscaler,
   executeGenerate3D,
   executeGenerateAudio,
   executeLlmGenerate,
@@ -1108,6 +1109,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           case "nanoBanana":
             await executeNanoBanana(executionCtx);
             break;
+          case "imageUpscaler":
+            await executeImageUpscaler(executionCtx);
+            break;
           case "generateVideo":
             await executeGenerateVideo(executionCtx);
             break;
@@ -1281,6 +1285,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
       if (node.type === "nanoBanana") {
         await executeNanoBanana(executionCtx, regenOptions);
+      } else if (node.type === "imageUpscaler") {
+        await executeImageUpscaler(executionCtx, regenOptions);
       } else if (node.type === "array") {
         await executeArray(executionCtx);
       } else if (node.type === "llmGenerate") {
@@ -1434,6 +1440,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           break;
         case "nanoBanana":
           await executeNanoBanana(executionCtx, regenOptions);
+          break;
+        case "imageUpscaler":
+          await executeImageUpscaler(executionCtx, regenOptions);
           break;
         case "generateVideo":
           await executeGenerateVideo(executionCtx, regenOptions);
