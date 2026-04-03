@@ -45,6 +45,7 @@ export type NodeType =
   | "switch"
   | "conditionalSwitch"
   | "generate3d"
+  | "imageUpscaler"
   | "glbViewer";
 
 /**
@@ -435,6 +436,17 @@ export interface SplitGridNodeData extends BaseNodeData {
 }
 
 /**
+ * Image Upscaler node - AI image upscaling via Kie.ai (Topaz)
+ */
+export interface ImageUpscalerNodeData extends BaseNodeData {
+  inputImage: string | null;
+  outputImage: string | null;
+  upscaleFactor: "1" | "2" | "4" | "8";
+  status: NodeStatus;
+  error: string | null;
+}
+
+/**
  * GLB 3D Viewer node - loads and displays 3D models, captures viewport as image
  */
 export interface GLBViewerNodeData extends BaseNodeData {
@@ -469,6 +481,7 @@ export type WorkflowNodeData =
   | RouterNodeData
   | SwitchNodeData
   | ConditionalSwitchNodeData
+  | ImageUpscalerNodeData
   | GLBViewerNodeData;
 
 /**

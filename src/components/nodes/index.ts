@@ -5,6 +5,7 @@ export { PromptNode } from "./PromptNode";
 export { ArrayNode } from "./ArrayNode";
 export { PromptConstructorNode } from "./PromptConstructorNode";
 export { GenerateImageNode, NanoBananaNode } from "./GenerateImageNode";
+export { ImageUpscalerNode } from "./ImageUpscalerNode";
 export { GenerateVideoNode } from "./GenerateVideoNode";
 export { Generate3DNode } from "./Generate3DNode";
 export { GenerateAudioNode } from "./GenerateAudioNode";

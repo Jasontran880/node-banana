@@ -22,6 +22,7 @@ import {
   RouterNodeData,
   SwitchNodeData,
   ConditionalSwitchNodeData,
+  ImageUpscalerNodeData,
   GLBViewerNodeData,
   WorkflowNodeData,
   GroupColor,
@@ -44,6 +45,7 @@ export const defaultNodeDimensions: Record<NodeType, { width: number; height: nu
   nanoBanana: { width: 300, height: 300 },
   generateVideo: { width: 300, height: 300 },
   generate3d: { width: 300, height: 300 },
+  imageUpscaler: { width: 300, height: 300 },
   generateAudio: { width: 300, height: 280 },
   llmGenerate: { width: 320, height: 360 },
   splitGrid: { width: 300, height: 320 },
@@ -316,6 +318,14 @@ export const createDefaultNodeData = (type: NodeType): WorkflowNodeData => {
           }
         ]
       } as ConditionalSwitchNodeData;
+    case "imageUpscaler":
+      return {
+        inputImage: null,
+        outputImage: null,
+        upscaleFactor: "2",
+        status: "idle",
+        error: null,
+      } as ImageUpscalerNodeData;
     case "glbViewer":
       return {
         glbUrl: null,

@@ -23,6 +23,7 @@ import {
   ArrayNodeData,
   PromptConstructorNodeData,
   LLMGenerateNodeData,
+  ImageUpscalerNodeData,
   GLBViewerNodeData,
   SwitchNodeData,
   ConditionalSwitchNodeData,
@@ -72,6 +73,8 @@ function getSourceOutput(
     return { type: "audio", value: (sourceNode.data as AudioInputNodeData).audioFile };
   } else if (sourceNode.type === "annotation") {
     return { type: "image", value: (sourceNode.data as AnnotationNodeData).outputImage };
+  } else if (sourceNode.type === "imageUpscaler") {
+    return { type: "image", value: (sourceNode.data as ImageUpscalerNodeData).outputImage };
   } else if (sourceNode.type === "nanoBanana") {
     const nbData = sourceNode.data as NanoBananaNodeData;
     return { type: "image", value: nbData.outputImage };

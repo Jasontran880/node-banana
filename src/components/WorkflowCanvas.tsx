@@ -45,6 +45,7 @@ import {
   RouterNode,
   SwitchNode,
   ConditionalSwitchNode,
+  ImageUpscalerNode,
 } from "./nodes";
 
 // Lazy-load GLBViewerNode to avoid bundling three.js for users who don't use 3D nodes
@@ -97,6 +98,7 @@ const nodeTypes: NodeTypes = {
   router: RouterNode,
   switch: SwitchNode,
   conditionalSwitch: ConditionalSwitchNode,
+  imageUpscaler: ImageUpscalerNode,
   glbViewer: GLBViewerNode,
 };
 
@@ -147,6 +149,8 @@ const getNodeHandles = (nodeType: string): { inputs: string[]; outputs: string[]
       return { inputs: ["text"], outputs: ["text"] };
     case "nanoBanana":
       return { inputs: ["image", "text"], outputs: ["image"] };
+    case "imageUpscaler":
+      return { inputs: ["image"], outputs: ["image"] };
     case "generateVideo":
       return { inputs: ["image", "text"], outputs: ["video"] };
     case "generate3d":
@@ -365,6 +369,7 @@ export function WorkflowCanvas() {
     array: 'Array',
     promptConstructor: 'Prompt Constructor',
     nanoBanana: 'Generate Image',
+    imageUpscaler: 'Image Upscaler',
     generateVideo: 'Generate Video',
     generate3d: 'Generate 3D',
     generateAudio: 'Generate Audio',
@@ -1472,6 +1477,7 @@ export function WorkflowCanvas() {
             router: { width: 200, height: 80 },
             switch: { width: 220, height: 120 },
             conditionalSwitch: { width: 260, height: 180 },
+            imageUpscaler: { width: 300, height: 300 },
             glbViewer: { width: 360, height: 380 },
           };
           const dims = defaultDimensions[nodeType];
@@ -2048,6 +2054,8 @@ export function WorkflowCanvas() {
                 return "#f472b6";
               case "nanoBanana":
                 return "#22c55e";
+              case "imageUpscaler":
+                return "#06b6d4"; // cyan-500 (upscaling/enhancement)
               case "generateVideo":
                 return "#9333ea";
               case "generate3d":
