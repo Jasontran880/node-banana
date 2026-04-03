@@ -118,7 +118,30 @@ export function getKieModelDefaults(modelId: string): Record<string, unknown> {
         resolution: "1080p",
       };
 
-    // Topaz video upscale
+    // Sora 2 Pro models
+    case "sora-2-pro-text-to-video":
+      return {
+        aspect_ratio: "landscape",
+        n_frames: "10",
+        size: "high",
+        upload_method: "s3",
+      };
+    case "sora-2-pro-image-to-video":
+      return {
+        aspect_ratio: "landscape",
+        n_frames: "10",
+        size: "standard",
+        upload_method: "s3",
+      };
+    case "sora-2-pro-storyboard":
+      return {
+        aspect_ratio: "landscape",
+        n_frames: "15",
+        upload_method: "s3",
+      };
+
+    // Topaz image/video upscale
+    case "topaz/image-upscale":
     case "topaz/video-upscale":
       return {
         upscale_factor: "2",
@@ -167,6 +190,8 @@ export function getKieImageInputKey(modelId: string): string {
   if (modelId === "kling/v2-5-turbo-image-to-video-pro") return "image_url";
   // Kling 2.6 motion control uses input_urls
   if (modelId === "kling-2.6/motion-control") return "input_urls";
+  // Topaz image upscale uses image_url (singular)
+  if (modelId === "topaz/image-upscale") return "image_url";
   // Topaz video upscale uses video_url (singular)
   if (modelId === "topaz/video-upscale") return "video_url";
   // Veo 3 models use imageUrls

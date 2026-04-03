@@ -891,6 +891,45 @@ function getKieSchema(modelId: string): ExtractedSchema {
         { name: "video_urls", type: "image", required: true, label: "Video", isArray: true },
       ],
     },
+    "sora-2-pro-text-to-video": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["landscape", "portrait"], default: "landscape" },
+        { name: "n_frames", type: "string", description: "Number of frames (affects duration)", enum: ["10", "15"], default: "10" },
+        { name: "size", type: "string", description: "Output quality", enum: ["standard", "high"], default: "high" },
+        { name: "remove_watermark", type: "boolean", description: "Remove watermark from output", default: false },
+      ],
+      inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }],
+    },
+    "sora-2-pro-image-to-video": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["landscape", "portrait"], default: "landscape" },
+        { name: "n_frames", type: "string", description: "Number of frames (affects duration)", enum: ["10", "15"], default: "10" },
+        { name: "size", type: "string", description: "Output quality", enum: ["standard", "high"], default: "standard" },
+        { name: "remove_watermark", type: "boolean", description: "Remove watermark from output", default: false },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "image_urls", type: "image", required: true, label: "Image", isArray: true },
+      ],
+    },
+    "sora-2-pro-storyboard": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["landscape", "portrait"], default: "landscape" },
+        { name: "n_frames", type: "string", description: "Number of frames (affects duration)", enum: ["10", "15", "25"], default: "15" },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: false, label: "Prompt" },
+        { name: "image_urls", type: "image", required: false, label: "Image", isArray: true },
+      ],
+    },
+    "topaz/image-upscale": {
+      parameters: [
+        { name: "upscale_factor", type: "string", description: "Upscale factor", enum: ["1", "2", "4", "8"], default: "2" },
+      ],
+      inputs: [
+        { name: "image_url", type: "image", required: true, label: "Image" },
+      ],
+    },
     "topaz/video-upscale": {
       parameters: [
         { name: "upscale_factor", type: "string", description: "Upscale factor", enum: ["1", "2", "4"], default: "2" },
