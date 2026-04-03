@@ -3,7 +3,7 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import { Handle, Position, NodeProps, Node } from "@xyflow/react";
 import { BaseNode } from "./BaseNode";
-import { useWorkflowStore, useProviderApiKeys } from "@/store/workflowStore";
+import { useWorkflowStore } from "@/store/workflowStore";
 import { ImageUpscalerNodeData } from "@/types";
 import { useToast } from "@/components/Toast";
 
@@ -14,7 +14,6 @@ export function ImageUpscalerNode({ id, data, selected }: NodeProps<ImageUpscale
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const regenerateNode = useWorkflowStore((state) => state.regenerateNode);
   const isRunning = useWorkflowStore((state) => state.isRunning);
-  const { kieEnabled, kieApiKey } = useProviderApiKeys();
 
   const prevStatusRef = useRef(nodeData.status);
   useEffect(() => {
@@ -39,7 +38,6 @@ export function ImageUpscalerNode({ id, data, selected }: NodeProps<ImageUpscale
     updateNodeData(id, { outputImage: null, status: "idle", error: null });
   }, [id, updateNodeData]);
 
-  const kieConfigured = kieEnabled && !!kieApiKey;
   const isLoading = nodeData.status === "loading";
 
   return (
@@ -178,12 +176,6 @@ export function ImageUpscalerNode({ id, data, selected }: NodeProps<ImageUpscale
             </button>
           )}
 
-          {/* Not configured warning */}
-          {!kieConfigured && (
-            <span className="text-[10px] text-yellow-400 shrink-0" title="Configure Kie.ai API key in settings">
-              ⚠ No key
-            </span>
-          )}
         </div>
       </div>
     </BaseNode>
