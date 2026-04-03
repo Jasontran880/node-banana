@@ -39,6 +39,7 @@ const ALL_NODES_CATEGORIES: { label: string; nodes: { type: NodeType; label: str
     label: "Process",
     nodes: [
       { type: "annotation", label: "Annotate" },
+      { type: "imageUpscaler", label: "Image Upscaler" },
       { type: "splitGrid", label: "Split Grid" },
       { type: "videoStitch", label: "Video Stitch" },
       { type: "videoTrim", label: "Video Trim" },
