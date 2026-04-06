@@ -972,6 +972,48 @@ function getKieSchema(modelId: string): ExtractedSchema {
         { name: "imageUrls", type: "image", required: true, label: "Image", isArray: true },
       ],
     },
+    "seedance-2/text-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }],
+    },
+    "seedance-2/image-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "first_frame_url", type: "image", required: false, label: "First Frame" },
+      ],
+    },
+    "seedance-2-fast/text-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }],
+    },
+    "seedance-2-fast/image-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "first_frame_url", type: "image", required: false, label: "First Frame" },
+      ],
+    },
   };
 
   return schemas[modelId] || { parameters: [], inputs: [] };

@@ -147,6 +147,18 @@ export function getKieModelDefaults(modelId: string): Record<string, unknown> {
         upscale_factor: "2",
       };
 
+    // Seedance 2.0 models
+    case "seedance-2/text-to-video":
+    case "seedance-2/image-to-video":
+    case "seedance-2-fast/text-to-video":
+    case "seedance-2-fast/image-to-video":
+      return {
+        resolution: "720p",
+        aspect_ratio: "16:9",
+        duration: 8,
+        generate_audio: true,
+      };
+
     // Veo 3 models
     case "veo3/text-to-video":
     case "veo3/image-to-video":
@@ -190,6 +202,8 @@ export function getKieImageInputKey(modelId: string): string {
   if (modelId === "kling/v2-5-turbo-image-to-video-pro") return "image_url";
   // Kling 2.6 motion control uses input_urls
   if (modelId === "kling-2.6/motion-control") return "input_urls";
+  // Seedance 2.0 I2V uses first_frame_url (singular)
+  if (modelId === "seedance-2/image-to-video" || modelId === "seedance-2-fast/image-to-video") return "first_frame_url";
   // Topaz image upscale uses image_url (singular)
   if (modelId === "topaz/image-upscale") return "image_url";
   // Topaz video upscale uses video_url (singular)
@@ -359,6 +373,15 @@ export async function pollKieTaskCompletion(
 }
 
 
+export function isSeedance2Model(modelId: string): boolean {
+  return modelId.startsWith("seedance-2/") || modelId.startsWith("seedance-2-fast/");
+}
+
+export function getSeedance2ApiModelId(modelId: string): string {
+  if (modelId.startsWith("seedance-2-fast/")) return "bytedance/seedance-2-fast";
+  return "bytedance/seedance-2";
+}
+
 export function isVeoModel(modelId: string): boolean {
   return modelId.startsWith("veo3/") || modelId.startsWith("veo3-fast/");
 }
@@ -457,7 +480,7 @@ export async function generateWithKie(
           // Single data URL - upload it
           const url = await uploadImageToKie(requestId, apiKey, value);
           // Singular keys get a string, plural keys get an array
-          if (key === "image_url" || key === "video_url" || key === "tail_image_url") {
+          if (key === "image_url" || key === "video_url" || key === "tail_image_url" || key === "first_frame_url" || key === "last_frame_url") {
             inputParams[key] = url;
           } else {
             inputParams[key] = [url];
@@ -478,7 +501,7 @@ export async function generateWithKie(
           }
           if (processedArray.length > 0) {
             // Singular keys get first element, plural keys get full array
-            if (key === "image_url" || key === "video_url" || key === "tail_image_url") {
+            if (key === "image_url" || key === "video_url" || key === "tail_image_url" || key === "first_frame_url" || key === "last_frame_url") {
               inputParams[key] = processedArray[0];
             } else {
               inputParams[key] = processedArray;
@@ -508,7 +531,7 @@ export async function generateWithKie(
     }
 
     // Some models use singular string, others use arrays
-    if (imageKey === "image_url" || imageKey === "video_url") {
+    if (imageKey === "image_url" || imageKey === "video_url" || imageKey === "first_frame_url" || imageKey === "last_frame_url") {
       inputParams[imageKey] = imageUrls[0];
     } else {
       inputParams[imageKey] = imageUrls;
@@ -649,9 +672,15 @@ export async function generateWithKie(
     }
   }
 
+  // Remap project model IDs to actual Kie API model IDs where they differ
+  let apiModelId = modelId;
+  if (isSeedance2Model(modelId)) {
+    apiModelId = getSeedance2ApiModelId(modelId);
+  }
+
   // All remaining Kie models use the standard createTask endpoint
   const requestBody: Record<string, unknown> = {
-    model: modelId,
+    model: apiModelId,
     input: inputParams,
   };
 
