@@ -16,7 +16,7 @@ import { GenerationInput, ModelCapability } from "@/lib/providers/types";
 import { generateWithGemini, generateWithGeminiVideo, extendVeoVideo } from "./providers/gemini";
 import { generateWithReplicate } from "./providers/replicate";
 import { clearFalInputMappingCache as _clearFalInputMappingCache, generateWithFalQueue } from "./providers/fal";
-import { generateWithKie } from "./providers/kie";
+import { generateWithKie, extendVeoKieVideo, getVeoApiModelId, isVeoModel as isKieVeoModel } from "./providers/kie";
 import { generateWithWaveSpeed } from "./providers/wavespeed";
 import { generateWithMuapi } from "./providers/muapi";
 import { generateWithHighsfield } from "./providers/higgsfield";
@@ -38,8 +38,10 @@ interface MultiProviderGenerateRequest extends GenerateRequest {
   dynamicInputs?: Record<string, string | string[]>;
   /** "extend" triggers Veo video extension instead of fresh generation */
   action?: "extend";
-  /** Google-hosted video URI from a prior Veo generation; required when action="extend" */
+  /** Google-hosted video URI from a prior Veo generation; required when action="extend" for Gemini Veo */
   veoVideoUri?: string;
+  /** Kie.ai task ID from a prior Veo 3.1 generation; required when action="extend" for Kie Veo */
+  kieVeoTaskId?: string;
 }
 
 
@@ -108,6 +110,7 @@ export async function POST(request: NextRequest) {
       mediaType,
       action,
       veoVideoUri,
+      kieVeoTaskId,
     } = body;
 
     // Prompt is required unless:
@@ -334,6 +337,56 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Handle Kie Veo extend action
+      if (action === "extend" && isKieVeoModel(selectedModel.modelId)) {
+        if (!kieVeoTaskId) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "kieVeoTaskId is required for Kie Veo extend action" },
+            { status: 400 }
+          );
+        }
+        const resolvedExtendPrompt = prompt || (dynamicInputs?.prompt
+          ? (Array.isArray(dynamicInputs.prompt) ? dynamicInputs.prompt[0] : dynamicInputs.prompt)
+          : undefined);
+        if (!resolvedExtendPrompt) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "A prompt is required to extend a Veo video" },
+            { status: 400 }
+          );
+        }
+
+        const extendResult = await extendVeoKieVideo(
+          requestId,
+          kieApiKey,
+          kieVeoTaskId,
+          resolvedExtendPrompt,
+          getVeoApiModelId(selectedModel.modelId),
+        );
+
+        if (!extendResult.success) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: extendResult.error || "Veo extend failed" },
+            { status: 500 }
+          );
+        }
+
+        const extendOutput = extendResult.outputs?.[0];
+        if (!extendOutput?.data && !extendOutput?.url) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "No output in Veo extend result" },
+            { status: 500 }
+          );
+        }
+
+        const extendMediaResponse = buildMediaResponse(extendOutput);
+        const extendResponseBody = await extendMediaResponse.json() as GenerateResponse;
+        const newKieTaskId = extendResult.metadata?.kieVeoTaskId as string | undefined;
+        return NextResponse.json<GenerateResponse>({
+          ...extendResponseBody,
+          ...(newKieTaskId ? { kieVeoTaskId: newKieTaskId } : {}),
+        });
+      }
+
       // Build generation input
       const genInput: GenerationInput = {
         model: {
@@ -361,13 +414,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Return first output
+      // Return first output, attaching kieVeoTaskId for Veo models
       const output = result.outputs?.[0];
       if (!output?.data && !output?.url) {
         return NextResponse.json<GenerateResponse>(
           { success: false, error: "No output in generation result" },
           { status: 500 }
         );
+      }
+
+      if (isKieVeoModel(selectedModel.modelId) && result.metadata?.kieVeoTaskId) {
+        const mediaResp = buildMediaResponse(output);
+        const mediaBody = await mediaResp.json() as GenerateResponse;
+        return NextResponse.json<GenerateResponse>({
+          ...mediaBody,
+          kieVeoTaskId: result.metadata.kieVeoTaskId as string,
+        });
       }
 
       return buildMediaResponse(output);

@@ -97,6 +97,9 @@ export async function executeGenerateVideo(
   const provider = nodeData.selectedModel.provider;
   const headers = buildGenerateHeaders(provider, providerSettings);
 
+  const isKieVeo = nodeData.selectedModel?.provider === "kie" &&
+    (nodeData.selectedModel.modelId.startsWith("veo3/") || nodeData.selectedModel.modelId.startsWith("veo3-fast/"));
+
   const requestPayload: Record<string, unknown> = {
     images,
     prompt: text,
@@ -104,7 +107,11 @@ export async function executeGenerateVideo(
     parameters: nodeData.parameters,
     dynamicInputs,
     mediaType: "video" as const,
-    ...(action === "extend" ? { action: "extend", veoVideoUri: nodeData.veoVideoUri } : {}),
+    ...(action === "extend" && isKieVeo
+      ? { action: "extend", kieVeoTaskId: nodeData.kieVeoTaskId }
+      : action === "extend"
+        ? { action: "extend", veoVideoUri: nodeData.veoVideoUri }
+        : {}),
   };
 
   try {
@@ -156,8 +163,10 @@ export async function executeGenerateVideo(
         error: null,
         videoHistory: updatedHistory,
         selectedVideoHistoryIndex: 0,
-        // Store the Veo video URI for extend feature (refreshed after each generation/extension)
+        // Store the Veo video URI for Gemini Veo extend feature (refreshed after each generation/extension)
         ...(result.veoVideoUri ? { veoVideoUri: result.veoVideoUri } : {}),
+        // Store the Kie.ai task ID for Kie Veo 3.1 extend feature
+        ...(result.kieVeoTaskId ? { kieVeoTaskId: result.kieVeoTaskId } : {}),
       });
 
       // Track cost

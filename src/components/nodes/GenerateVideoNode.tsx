@@ -189,7 +189,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   );
 
   const handleClearVideo = useCallback(() => {
-    updateNodeData(id, { outputVideo: null, status: "idle", error: null, veoVideoUri: null });
+    updateNodeData(id, { outputVideo: null, status: "idle", error: null, veoVideoUri: null, kieVeoTaskId: null });
   }, [id, updateNodeData]);
 
   const handleParametersChange = useCallback(
@@ -244,8 +244,15 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     updateNodeData(id, { extendPrompt: e.target.value });
   }, [id, updateNodeData]);
 
-  // Show extend UI for Veo nodes that have a stored video URI
-  const showExtendPanel = isVeoModel(nodeData.selectedModel?.modelId) && !!nodeData.veoVideoUri;
+  const isKieVeoSelected = (modelId: string | undefined): boolean => {
+    if (!modelId) return false;
+    return modelId.startsWith("veo3/") || modelId.startsWith("veo3-fast/");
+  };
+
+  // Show extend UI for Veo nodes that have a stored video URI (Gemini) or task ID (Kie)
+  const showExtendPanel =
+    (isVeoModel(nodeData.selectedModel?.modelId) && !!nodeData.veoVideoUri) ||
+    (isKieVeoSelected(nodeData.selectedModel?.modelId) && !!nodeData.kieVeoTaskId);
 
   // Extend button active when there's a non-empty prompt
   const canExtend = showExtendPanel && !!(nodeData.extendPrompt?.trim());

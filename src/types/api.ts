@@ -30,6 +30,7 @@ export interface GenerateResponse {
   model3dUrl?: string; // For 3D models, return GLB URL directly
   contentType?: "image" | "video" | "3d" | "audio";
   veoVideoUri?: string; // Google-hosted URI returned after Veo generation/extension, used for extend feature
+  kieVeoTaskId?: string; // Kie.ai Veo task ID returned after generation, used for extend
   error?: string;
 }
 
