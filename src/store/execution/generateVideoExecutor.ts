@@ -47,7 +47,10 @@ export async function executeGenerateVideo(
 
   if (useStoredFallback) {
     images = connectedImages.length > 0 ? connectedImages : nodeData.inputImages;
-    text = connectedText ?? nodeData.inputPrompt;
+    // For extend, prefer the inline extendPrompt field, then fall back to connected/stored prompt
+    text = action === "extend"
+      ? (nodeData.extendPrompt || connectedText || nodeData.inputPrompt)
+      : (connectedText ?? nodeData.inputPrompt);
     // For extend, only a prompt is required (no images needed)
     if (action === "extend") {
       const hasPrompt = text || dynamicInputs.prompt;

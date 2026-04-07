@@ -239,13 +239,16 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     extendVideo(id);
   }, [id, extendVideo]);
 
-  // Extend is available for Veo 3.1/3.1-fast nodes with a stored URI and a prompt
-  const canExtend = useMemo(() => {
-    if (!isVeoModel(nodeData.selectedModel?.modelId)) return false;
-    if (!nodeData.veoVideoUri) return false;
-    if (!nodeData.inputPrompt && !nodeData.outputVideo) return false;
-    return true;
-  }, [nodeData.selectedModel?.modelId, nodeData.veoVideoUri, nodeData.inputPrompt, nodeData.outputVideo]);
+  // Extend prompt text change handler
+  const handleExtendPromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateNodeData(id, { extendPrompt: e.target.value });
+  }, [id, updateNodeData]);
+
+  // Show extend UI for Veo nodes that have a stored video URI
+  const showExtendPanel = isVeoModel(nodeData.selectedModel?.modelId) && !!nodeData.veoVideoUri;
+
+  // Extend button active when there's a non-empty prompt
+  const canExtend = showExtendPanel && !!(nodeData.extendPrompt?.trim());
 
   // Load video by ID from generations folder
   const loadVideoById = useCallback(async (videoId: string) => {
@@ -637,6 +640,30 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
         Video
       </div>
 
+      {/* Extend prompt panel — shown for Veo nodes after a video has been generated */}
+      {showExtendPanel && (
+        <div className="px-2 pb-1.5 pt-1 flex flex-col gap-1 border-t border-neutral-700/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-neutral-400 font-medium">Extend prompt</span>
+            <button
+              onClick={handleExtend}
+              disabled={!canExtend || isRunning || nodeData.status === "loading"}
+              className="h-5 px-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed rounded text-white text-[10px] font-medium transition-colors"
+              title={canExtend ? "Extend video by ~8 seconds" : "Enter a prompt to extend"}
+            >
+              +8s
+            </button>
+          </div>
+          <textarea
+            value={nodeData.extendPrompt ?? ""}
+            onChange={handleExtendPromptChange}
+            placeholder="Describe how to continue the video…"
+            rows={2}
+            className="w-full text-[11px] bg-neutral-800 text-neutral-100 placeholder-neutral-500 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-violet-500 nodrag"
+          />
+        </div>
+      )}
+
       <div className="relative w-full h-full min-h-0 overflow-hidden rounded-lg">
         {/* Preview area */}
         {nodeData.outputVideo ? (
@@ -715,18 +742,8 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
                 </svg>
               </div>
             )}
-            {/* Top-right controls: extend (Veo only) + clear */}
-            <div className="absolute top-1 right-1 flex items-center gap-1">
-              {canExtend && (
-                <button
-                  onClick={handleExtend}
-                  disabled={isRunning || nodeData.status === "loading"}
-                  className="h-5 px-1.5 bg-neutral-900/80 hover:bg-violet-600/80 disabled:opacity-40 disabled:cursor-not-allowed rounded flex items-center justify-center text-neutral-300 hover:text-white transition-colors text-[10px] font-medium whitespace-nowrap"
-                  title="Extend video by ~8 seconds using the connected prompt"
-                >
-                  +8s
-                </button>
-              )}
+            {/* Clear button */}
+            <div className="absolute top-1 right-1">
               <button
                 onClick={handleClearVideo}
                 className="w-5 h-5 bg-neutral-900/80 hover:bg-red-600/80 rounded flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
