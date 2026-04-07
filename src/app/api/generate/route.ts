@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GenerateRequest, GenerateResponse, ModelType, SelectedModel, ProviderType } from "@/types";
 import { GenerationInput, ModelCapability } from "@/lib/providers/types";
-import { generateWithGemini, generateWithGeminiVideo } from "./providers/gemini";
+import { generateWithGemini, generateWithGeminiVideo, extendVeoVideo } from "./providers/gemini";
 import { generateWithReplicate } from "./providers/replicate";
 import { clearFalInputMappingCache as _clearFalInputMappingCache, generateWithFalQueue } from "./providers/fal";
 import { generateWithKie } from "./providers/kie";
@@ -36,6 +36,10 @@ interface MultiProviderGenerateRequest extends GenerateRequest {
   parameters?: Record<string, unknown>;
   /** Dynamic inputs from schema-based connections (e.g., image_url, tail_image_url, prompt) */
   dynamicInputs?: Record<string, string | string[]>;
+  /** "extend" triggers Veo video extension instead of fresh generation */
+  action?: "extend";
+  /** Google-hosted video URI from a prior Veo generation; required when action="extend" */
+  veoVideoUri?: string;
 }
 
 
@@ -102,6 +106,8 @@ export async function POST(request: NextRequest) {
       parameters,
       dynamicInputs,
       mediaType,
+      action,
+      veoVideoUri,
     } = body;
 
     // Prompt is required unless:
@@ -615,22 +621,47 @@ export async function POST(request: NextRequest) {
 
     // Check if this is a Veo video model request
     if (selectedModel?.modelId?.startsWith("veo-")) {
-      // Merge negative prompt from dynamic inputs (connected handle) into parameters
-      const veoParams = { ...(parameters || {}) };
-      if (dynamicInputs?.negative_prompt) {
-        const neg = Array.isArray(dynamicInputs.negative_prompt)
-          ? dynamicInputs.negative_prompt[0]
-          : dynamicInputs.negative_prompt;
-        if (neg) veoParams.negativePrompt = neg;
+      let result;
+
+      if (action === "extend") {
+        // Extend an existing Veo video — requires URI and prompt
+        if (!veoVideoUri) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "veoVideoUri is required for extend action" },
+            { status: 400 }
+          );
+        }
+        if (!resolvedPrompt) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "A prompt is required to extend a video" },
+            { status: 400 }
+          );
+        }
+        result = await extendVeoVideo(
+          requestId,
+          geminiApiKey,
+          selectedModel.modelId,
+          veoVideoUri,
+          resolvedPrompt,
+        );
+      } else {
+        // Normal Veo generation
+        const veoParams = { ...(parameters || {}) };
+        if (dynamicInputs?.negative_prompt) {
+          const neg = Array.isArray(dynamicInputs.negative_prompt)
+            ? dynamicInputs.negative_prompt[0]
+            : dynamicInputs.negative_prompt;
+          if (neg) veoParams.negativePrompt = neg;
+        }
+        result = await generateWithGeminiVideo(
+          requestId,
+          geminiApiKey,
+          selectedModel.modelId,
+          resolvedPrompt || "",
+          images || [],
+          veoParams,
+        );
       }
-      const result = await generateWithGeminiVideo(
-        requestId,
-        geminiApiKey,
-        selectedModel.modelId,
-        resolvedPrompt || "",
-        images || [],
-        veoParams,
-      );
 
       if (!result.success) {
         return NextResponse.json<GenerateResponse>(
@@ -647,7 +678,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      const mediaResponse = buildMediaResponse(output);
+      // Attach veoVideoUri to the response so the executor can store it for future extends
+      const responseBody = await mediaResponse.json() as GenerateResponse;
+      const resultUri = result.metadata?.veoVideoUri as string | undefined;
+      return NextResponse.json<GenerateResponse>({
+        ...responseBody,
+        ...(resultUri ? { veoVideoUri: resultUri } : {}),
+      });
     }
 
     return await generateWithGemini(

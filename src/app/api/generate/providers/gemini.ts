@@ -345,10 +345,114 @@ export async function generateWithGeminiVideo(
     return {
       success: true,
       outputs: [{ type: "video", data: dataUrl }],
+      metadata: { veoVideoUri: videoUri },
     };
   } catch (error) {
     console.error(`[API:${requestId}] Failed to download video: ${error}`);
     return { success: false, error: "Failed to download generated video" };
+  } finally {
+    clearTimeout(fetchTimeout);
+  }
+}
+
+/**
+ * Extend an existing Veo video by ~8 seconds using Google's video extension feature.
+ * Requires a video URI from a previous Veo generation (valid for 2 days).
+ */
+export async function extendVeoVideo(
+  requestId: string,
+  apiKey: string,
+  modelId: string,
+  videoUri: string,
+  prompt: string,
+): Promise<GenerationOutput> {
+  const apiModelId = VEO_MODEL_MAP[modelId];
+  if (!apiModelId) {
+    return { success: false, error: `Unknown Veo model: ${modelId}` };
+  }
+
+  console.log(`[API:${requestId}] Veo extend - Model: ${apiModelId}, URI: ${videoUri.substring(0, 80)}...`);
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const config = {
+    numberOfVideos: 1,
+    resolution: "720p",
+    durationSeconds: 8,
+  };
+
+  const startTime = Date.now();
+
+  let operation;
+  try {
+    operation = await ai.models.generateVideos({
+      model: apiModelId,
+      prompt,
+      config,
+      video: { uri: videoUri },
+    } as unknown as Parameters<typeof ai.models.generateVideos>[0]);
+
+    const POLL_INTERVAL = 10_000;
+    const TIMEOUT = 5 * 60 * 1000;
+
+    while (!operation.done) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > TIMEOUT) {
+        console.error(`[API:${requestId}] Veo extend timed out after ${(elapsed / 1000).toFixed(0)}s`);
+        return { success: false, error: "Video extension timed out after 5 minutes" };
+      }
+
+      console.log(`[API:${requestId}] Veo extend polling... (${(elapsed / 1000).toFixed(0)}s elapsed)`);
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+      operation = await ai.operations.getVideosOperation({ operation });
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[API:${requestId}] Veo extend failed: ${msg}`);
+    return { success: false, error: `Video extension failed: ${msg}` };
+  }
+
+  const duration = Date.now() - startTime;
+  console.log(`[API:${requestId}] Veo extend completed in ${(duration / 1000).toFixed(1)}s`);
+
+  const generatedVideos = operation.response?.generatedVideos;
+  if (!generatedVideos || generatedVideos.length === 0) {
+    return { success: false, error: "No video generated. The content may have been filtered by safety policies." };
+  }
+
+  const newVideoUri = generatedVideos[0]?.video?.uri;
+  if (!newVideoUri) {
+    return { success: false, error: "No video URI in extend response" };
+  }
+
+  const videoUrl = `${newVideoUri}&key=${apiKey}`;
+  console.log(`[API:${requestId}] Fetching extended video from URI...`);
+
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const videoResponse = await fetch(videoUrl, { signal: controller.signal });
+    if (!videoResponse.ok) {
+      return { success: false, error: `Failed to download extended video: ${videoResponse.status}` };
+    }
+
+    const videoBuffer = await videoResponse.arrayBuffer();
+    const videoSizeMB = (videoBuffer.byteLength / (1024 * 1024)).toFixed(2);
+    console.log(`[API:${requestId}] Extended video downloaded: ${videoSizeMB}MB`);
+
+    const base64Video = Buffer.from(videoBuffer).toString("base64");
+    const dataUrl = `data:video/mp4;base64,${base64Video}`;
+
+    console.log(`[API:${requestId}] EXTEND SUCCESS - Returning ${videoSizeMB}MB video`);
+
+    return {
+      success: true,
+      outputs: [{ type: "video", data: dataUrl }],
+      metadata: { veoVideoUri: newVideoUri },
+    };
+  } catch (error) {
+    console.error(`[API:${requestId}] Failed to download extended video: ${error}`);
+    return { success: false, error: "Failed to download extended video" };
   } finally {
     clearTimeout(fetchTimeout);
   }

@@ -29,6 +29,7 @@ export interface GenerateResponse {
   audioUrl?: string; // For large audio, return URL directly
   model3dUrl?: string; // For 3D models, return GLB URL directly
   contentType?: "image" | "video" | "3d" | "audio";
+  veoVideoUri?: string; // Google-hosted URI returned after Veo generation/extension, used for extend feature
   error?: string;
 }
 

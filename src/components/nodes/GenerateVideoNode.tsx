@@ -189,7 +189,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   );
 
   const handleClearVideo = useCallback(() => {
-    updateNodeData(id, { outputVideo: null, status: "idle", error: null });
+    updateNodeData(id, { outputVideo: null, status: "idle", error: null, veoVideoUri: null });
   }, [id, updateNodeData]);
 
   const handleParametersChange = useCallback(
@@ -228,11 +228,24 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   );
 
   const regenerateNode = useWorkflowStore((state) => state.regenerateNode);
+  const extendVideo = useWorkflowStore((state) => state.extendVideo);
   const isRunning = useWorkflowStore((state) => state.isRunning);
 
   const handleRegenerate = useCallback(() => {
     regenerateNode(id);
   }, [id, regenerateNode]);
+
+  const handleExtend = useCallback(() => {
+    extendVideo(id);
+  }, [id, extendVideo]);
+
+  // Extend is available for Veo 3.1/3.1-fast nodes with a stored URI and a prompt
+  const canExtend = useMemo(() => {
+    if (!isVeoModel(nodeData.selectedModel?.modelId)) return false;
+    if (!nodeData.veoVideoUri) return false;
+    if (!nodeData.inputPrompt && !nodeData.outputVideo) return false;
+    return true;
+  }, [nodeData.selectedModel?.modelId, nodeData.veoVideoUri, nodeData.inputPrompt, nodeData.outputVideo]);
 
   // Load video by ID from generations folder
   const loadVideoById = useCallback(async (videoId: string) => {
@@ -702,8 +715,18 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
                 </svg>
               </div>
             )}
-            {/* Clear button */}
-            <div className="absolute top-1 right-1">
+            {/* Top-right controls: extend (Veo only) + clear */}
+            <div className="absolute top-1 right-1 flex items-center gap-1">
+              {canExtend && (
+                <button
+                  onClick={handleExtend}
+                  disabled={isRunning || nodeData.status === "loading"}
+                  className="h-5 px-1.5 bg-neutral-900/80 hover:bg-violet-600/80 disabled:opacity-40 disabled:cursor-not-allowed rounded flex items-center justify-center text-neutral-300 hover:text-white transition-colors text-[10px] font-medium whitespace-nowrap"
+                  title="Extend video by ~8 seconds using the connected prompt"
+                >
+                  +8s
+                </button>
+              )}
               <button
                 onClick={handleClearVideo}
                 className="w-5 h-5 bg-neutral-900/80 hover:bg-red-600/80 rounded flex items-center justify-center text-neutral-400 hover:text-white transition-colors"

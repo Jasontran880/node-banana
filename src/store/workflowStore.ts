@@ -259,6 +259,7 @@ interface WorkflowStore {
   _buildExecutionContext: (node: WorkflowNode, signal?: AbortSignal) => NodeExecutionContext;
   executeWorkflow: (startFromNodeId?: string) => Promise<void>;
   regenerateNode: (nodeId: string) => Promise<void>;
+  extendVideo: (nodeId: string) => Promise<void>;
   executeSelectedNodes: (nodeIds: string[]) => Promise<void>;
   stopWorkflow: () => void;
   setMaxConcurrentCalls: (value: number) => void;
@@ -1362,6 +1363,47 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       updateNodeData(nodeId, {
         status: "error",
         error: error instanceof Error ? error.message : "Regeneration failed",
+      });
+      set({ isRunning: false, currentNodeIds: [] });
+
+      saveLogSession();
+      await logger.endSession();
+    }
+  },
+
+  extendVideo: async (nodeId: string) => {
+    const { nodes, updateNodeData, isRunning } = get();
+
+    if (isRunning) {
+      logger.warn('node.execution', 'Cannot extend video, workflow already running', { nodeId });
+      return;
+    }
+
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      logger.warn('node.error', 'Node not found for video extension', { nodeId });
+      return;
+    }
+
+    set({ isRunning: true, currentNodeIds: [nodeId] });
+
+    await logger.startSession();
+    logger.info('node.execution', 'Extending Veo video', { nodeId });
+
+    try {
+      const executionCtx = get()._buildExecutionContext(node);
+      await executeGenerateVideo(executionCtx, { useStoredFallback: true, action: "extend" });
+
+      logger.info('node.execution', 'Video extension completed successfully', { nodeId });
+      set({ isRunning: false, currentNodeIds: [] });
+
+      saveLogSession();
+      await logger.endSession();
+    } catch (error) {
+      logger.error('node.error', 'Video extension failed', { nodeId }, error instanceof Error ? error : undefined);
+      updateNodeData(nodeId, {
+        status: "error",
+        error: error instanceof Error ? error.message : "Video extension failed",
       });
       set({ isRunning: false, currentNodeIds: [] });
 

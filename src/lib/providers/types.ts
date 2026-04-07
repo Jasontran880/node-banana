@@ -112,6 +112,8 @@ export interface GenerationOutput {
   }>;
   /** Error message if success is false */
   error?: string;
+  /** Provider-specific metadata (e.g., veoVideoUri for Veo extend feature) */
+  metadata?: Record<string, unknown>;
 }
 
 /**

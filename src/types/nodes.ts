@@ -200,6 +200,7 @@ export interface GenerateVideoNodeData extends BaseNodeData {
   inputSchema?: ModelInputDef[]; // Model's input schema for dynamic handles
   parametersExpanded?: boolean; // Collapse state for inline parameter display
   _settingsPanelHeight?: number; // Measured settings panel height for reload correction
+  veoVideoUri?: string | null; // Google-hosted URI from last Veo generation; valid 2 days, required for extend
   status: NodeStatus;
   error: string | null;
   videoHistory: CarouselVideoItem[]; // Carousel history (IDs only)
