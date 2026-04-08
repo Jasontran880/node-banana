@@ -671,8 +671,23 @@ export async function generateWithKie(
       aspect_ratio: inputParams.aspect_ratio || "16:9",
     };
 
-    // Add image URLs if present (for image-to-video)
-    if (inputParams.imageUrls) {
+    // Build imageUrls from first_frame / last_frame dynamic inputs (I2V)
+    const frameUrls: string[] = [];
+    for (const key of ["first_frame", "last_frame"] as const) {
+      const val = inputParams[key];
+      if (val) {
+        const url = Array.isArray(val) ? val[0] : val;
+        if (url) frameUrls.push(url as string);
+      }
+    }
+
+    if (frameUrls.length > 0) {
+      veoBody.imageUrls = frameUrls;
+      veoBody.generationType = frameUrls.length === 2
+        ? "FIRST_AND_LAST_FRAMES_2_VIDEO"
+        : "REFERENCE_2_VIDEO";
+    } else if (inputParams.imageUrls) {
+      // Fallback: legacy imageUrls if still present
       veoBody.imageUrls = Array.isArray(inputParams.imageUrls)
         ? inputParams.imageUrls
         : [inputParams.imageUrls];

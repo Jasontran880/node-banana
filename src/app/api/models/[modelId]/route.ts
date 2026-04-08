@@ -952,7 +952,8 @@ function getKieSchema(modelId: string): ExtractedSchema {
       ],
       inputs: [
         { name: "prompt", type: "text", required: true, label: "Prompt" },
-        { name: "imageUrls", type: "image", required: true, label: "Image", isArray: true },
+        { name: "first_frame", type: "image", required: true, label: "First Frame" },
+        { name: "last_frame", type: "image", required: false, label: "Last Frame" },
       ],
     },
     "veo3-fast/text-to-video": {
@@ -969,7 +970,8 @@ function getKieSchema(modelId: string): ExtractedSchema {
       ],
       inputs: [
         { name: "prompt", type: "text", required: true, label: "Prompt" },
-        { name: "imageUrls", type: "image", required: true, label: "Image", isArray: true },
+        { name: "first_frame", type: "image", required: true, label: "First Frame" },
+        { name: "last_frame", type: "image", required: false, label: "Last Frame" },
       ],
     },
     "seedance-2/text-to-video": {
