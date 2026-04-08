@@ -311,6 +311,7 @@ export function FloatingActionBar() {
   const {
     nodes,
     isRunning,
+    activeRuns,
     currentNodeIds,
     executeWorkflow,
     regenerateNode,
@@ -325,6 +326,7 @@ export function FloatingActionBar() {
   } = useWorkflowStore(useShallow((state) => ({
     nodes: state.nodes,
     isRunning: state.isRunning,
+    activeRuns: state.activeRuns,
     currentNodeIds: state.currentNodeIds,
     executeWorkflow: state.executeWorkflow,
     regenerateNode: state.regenerateNode,
@@ -338,16 +340,19 @@ export function FloatingActionBar() {
     modelSearchProvider: state.modelSearchProvider,
   })));
 
+  const activeRunCount = activeRuns.size;
+
   // Get display text for running nodes
   const runningNodeCount = currentNodeIds.length;
   const getRunningLabel = () => {
+    if (activeRunCount > 1) return `${activeRunCount} runs`;
     if (runningNodeCount === 0) return "Running...";
     if (runningNodeCount === 1) {
       const node = nodes.find((n) => n.id === currentNodeIds[0]);
       const nodeName = node?.data?.customTitle || node?.type || "node";
       return `Running ${nodeName}...`;
     }
-    return `Running ${runningNodeCount} nodes...`;
+    return `${runningNodeCount} nodes`;
   };
   const [runMenuOpen, setRunMenuOpen] = useState(false);
   const runMenuRef = useRef<HTMLDivElement>(null);
@@ -385,11 +390,7 @@ export function FloatingActionBar() {
   };
 
   const handleRunClick = () => {
-    if (isRunning) {
-      stopWorkflow();
-    } else {
-      executeWorkflow();
-    }
+    executeWorkflow();
   };
 
   const handleRunFromSelected = () => {
@@ -452,16 +453,15 @@ export function FloatingActionBar() {
 
         <div className="w-px h-5 bg-neutral-600 mx-1.5" />
 
-        <div className="relative flex items-center" ref={runMenuRef}>
+        <div className="relative flex items-center gap-1" ref={runMenuRef}>
+          {/* Run button — always launches a new run */}
           <button
             onClick={handleRunClick}
-            disabled={!valid && !isRunning}
-            title={!valid ? errors.join("\n") : isRunning ? "Stop" : "Run"}
+            disabled={!valid}
+            title={!valid ? errors.join("\n") : isRunning ? "Launch another run" : "Run"}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors ${
-              isRunning
-                ? "bg-white text-neutral-900 hover:bg-neutral-200 rounded"
-                : valid
-                ? "bg-white text-neutral-900 hover:bg-neutral-200 rounded-l"
+              valid
+                ? `bg-white text-neutral-900 hover:bg-neutral-200 ${isRunning ? "rounded" : "rounded-l"}`
                 : "bg-neutral-700 text-neutral-500 cursor-not-allowed rounded"
             }`}
           >
@@ -487,7 +487,7 @@ export function FloatingActionBar() {
                   />
                 </svg>
                 <span className="max-w-[150px] truncate" title={getRunningLabel()}>
-                  {runningNodeCount > 1 ? `${runningNodeCount} nodes` : "Stop"}
+                  {getRunningLabel()}
                 </span>
               </>
             ) : (
@@ -504,7 +504,21 @@ export function FloatingActionBar() {
             )}
           </button>
 
-          {/* Dropdown chevron button */}
+          {/* Stop button — appears when any run is active */}
+          {isRunning && (
+            <button
+              onClick={() => stopWorkflow()}
+              title="Stop all runs"
+              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium bg-neutral-700 text-neutral-200 hover:bg-red-900/60 hover:text-red-300 rounded transition-colors"
+            >
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="4" y="4" width="16" height="16" rx="1" />
+              </svg>
+              <span>Stop</span>
+            </button>
+          )}
+
+          {/* Dropdown chevron button — only shown when idle */}
           {!isRunning && valid && (
             <button
               onClick={() => setRunMenuOpen(!runMenuOpen)}

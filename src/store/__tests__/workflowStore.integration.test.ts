@@ -1210,22 +1210,27 @@ describe("workflowStore integration tests", () => {
         expect(useWorkflowStore.getState().isRunning).toBe(false);
       });
 
-      it("should ignore execution request if already running", async () => {
+      it("should allow a new run while another is tracked in activeRuns", async () => {
+        // Seed an existing run in activeRuns to simulate an in-progress workflow
+        const existingController = new AbortController();
+        const existingRun = { currentNodeIds: ["some-node"], abortController: existingController };
         useWorkflowStore.setState({
           nodes: [
             createTestNode("prompt-1", "prompt", { prompt: "test" }),
           ],
           edges: [],
-          isRunning: true, // Already running
+          isRunning: true,
+          activeRuns: new Map([["existing-run-id", existingRun]]),
         });
 
         const store = useWorkflowStore.getState();
 
-        // This should return immediately without doing anything
+        // executeWorkflow now runs in parallel — it should complete and clean up its own run
         await store.executeWorkflow();
 
-        // Should still be running (our mock state)
+        // The existing run is still tracked; isRunning should remain true
         expect(useWorkflowStore.getState().isRunning).toBe(true);
+        expect(useWorkflowStore.getState().activeRuns.size).toBe(1);
       });
 
       it("should clear currentNodeIds after execution completes", async () => {
@@ -2324,7 +2329,7 @@ describe("workflowStore integration tests", () => {
       vi.unstubAllGlobals();
     });
 
-    it("should only execute nodes once when executeWorkflow is called concurrently", async () => {
+    it("should execute both runs when executeWorkflow is called concurrently", async () => {
       useWorkflowStore.setState({
         nodes: [
           createTestNode("prompt-1", "prompt", { prompt: "test" }),
@@ -2341,13 +2346,13 @@ describe("workflowStore integration tests", () => {
 
       const store = useWorkflowStore.getState();
 
-      // Fire two calls back-to-back without awaiting the first
+      // Fire two calls back-to-back without awaiting the first — both should run in parallel
       const p1 = store.executeWorkflow();
       const p2 = store.executeWorkflow();
       await Promise.all([p1, p2]);
 
-      // Only one execution should have reached fetch (one nanoBanana node)
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Both runs execute the nanoBanana node, so fetch is called twice
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it("should set isRunning synchronously before any await", async () => {

@@ -9,7 +9,7 @@ import { WorkflowNode, WorkflowEdge, WorkflowNodeData } from "@/types";
 
 // Concurrency settings
 export const CONCURRENCY_SETTINGS_KEY = "node-banana-concurrency-limit";
-export const DEFAULT_MAX_CONCURRENT_CALLS = 3;
+export const DEFAULT_MAX_CONCURRENT_CALLS = 20;
 
 /**
  * Load concurrency setting from localStorage
@@ -19,7 +19,7 @@ export const loadConcurrencySetting = (): number => {
   const stored = localStorage.getItem(CONCURRENCY_SETTINGS_KEY);
   if (stored) {
     const parsed = parseInt(stored, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) {
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
       return parsed;
     }
   }

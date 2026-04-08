@@ -59,7 +59,7 @@ import {
   chunk,
   clearNodeImageRefs,
 } from "./utils/executionUtils";
-import { getConnectedInputsPure, validateWorkflowPure } from "./utils/connectedInputs";
+import { getConnectedInputsPure, validateWorkflowPure, RunNodeOutputs } from "./utils/connectedInputs";
 import { evaluateRule } from "./utils/ruleEvaluation";
 import { computeDimmedNodes } from "./utils/dimmingUtils";
 import {
@@ -252,16 +252,17 @@ interface WorkflowStore {
 
   // Execution
   isRunning: boolean;
-  currentNodeIds: string[];  // Changed from currentNodeId for parallel execution
+  currentNodeIds: string[];  // Union of all active run node IDs
   pausedAtNodeId: string | null;
-  maxConcurrentCalls: number;  // Configurable concurrency limit (1-10)
-  _abortController: AbortController | null;  // Internal: for cancellation
+  maxConcurrentCalls: number;  // Configurable concurrency limit (1-20)
+  _abortController: AbortController | null;  // Internal: for single-node cancellation (regenerate/extend/selected)
+  activeRuns: Map<string, { currentNodeIds: string[]; abortController: AbortController }>;  // Parallel workflow runs
   _buildExecutionContext: (node: WorkflowNode, signal?: AbortSignal) => NodeExecutionContext;
   executeWorkflow: (startFromNodeId?: string) => Promise<void>;
   regenerateNode: (nodeId: string) => Promise<void>;
   extendVideo: (nodeId: string) => Promise<void>;
   executeSelectedNodes: (nodeIds: string[]) => Promise<void>;
-  stopWorkflow: () => void;
+  stopWorkflow: (runId?: string) => void;
   setMaxConcurrentCalls: (value: number) => void;
 
   // Save/Load
@@ -271,7 +272,7 @@ interface WorkflowStore {
 
   // Helpers
   getNodeById: (id: string) => WorkflowNode | undefined;
-  getConnectedInputs: (nodeId: string) => { images: string[]; videos: string[]; audio: string[]; model3d: string | null; text: string | null; dynamicInputs: Record<string, string | string[]>; easeCurve: { bezierHandles: [number, number, number, number]; easingPreset: string | null; outputDuration: number } | null };
+  getConnectedInputs: (nodeId: string, runOutputs?: Map<string, RunNodeOutputs>) => { images: string[]; videos: string[]; audio: string[]; model3d: string | null; text: string | null; dynamicInputs: Record<string, string | string[]>; easeCurve: { bezierHandles: [number, number, number, number]; easingPreset: string | null; outputDuration: number } | null };
   validateWorkflow: () => { valid: boolean; errors: string[] };
 
   // Global Image History
@@ -449,6 +450,25 @@ function clearStaleInputImages(
   }
 }
 
+/**
+ * Clears single-node run state (regenerateNode / extendVideo / executeSelectedNodes)
+ * while preserving any in-progress parallel workflow runs in activeRuns.
+ */
+function clearLegacyRunState(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  set: (partial: any) => void,
+  get: () => WorkflowStore,
+  extra?: Record<string, unknown>
+): void {
+  const { activeRuns } = get();
+  const runs = [...activeRuns.values()];
+  set({
+    isRunning: activeRuns.size > 0,
+    currentNodeIds: [...new Set(runs.flatMap(r => r.currentNodeIds))],
+    ...extra,
+  });
+}
+
 const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   nodes: [],
   edges: [],
@@ -460,10 +480,11 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   showQuickstart: true,
   hoveredNodeId: null,
   isRunning: false,
-  currentNodeIds: [],  // Changed from currentNodeId for parallel execution
+  currentNodeIds: [],  // Union of all active run node IDs
   pausedAtNodeId: null,
-  maxConcurrentCalls: loadConcurrencySetting(),  // Default 3, configurable 1-10
-  _abortController: null,  // Internal: for cancellation
+  maxConcurrentCalls: loadConcurrencySetting(),  // Default 20, configurable 1-20
+  _abortController: null,  // Internal: for single-node cancellation
+  activeRuns: new Map(),
   globalImageHistory: [],
 
   // Auto-save initial state
@@ -949,9 +970,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     return get().nodes.find((node) => node.id === id);
   },
 
-  getConnectedInputs: (nodeId: string) => {
+  getConnectedInputs: (nodeId: string, runOutputs?: Map<string, RunNodeOutputs>) => {
     const { edges, nodes, dimmedNodeIds } = get();
-    return getConnectedInputsPure(nodeId, nodes, edges, undefined, dimmedNodeIds);
+    return getConnectedInputsPure(nodeId, nodes, edges, undefined, dimmedNodeIds, runOutputs);
   },
 
   validateWorkflow: () => {
@@ -990,22 +1011,110 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   }),
 
   executeWorkflow: async (startFromNodeId?: string) => {
-    const { nodes, edges, groups, isRunning, maxConcurrentCalls } = get();
+    const { nodes, edges, groups, maxConcurrentCalls } = get();
 
-    if (isRunning) {
-      logger.warn('workflow.start', 'Workflow already running, ignoring execution request');
-      return;
-    }
-
-    // Create AbortController for this execution run
+    // Generate a unique ID for this run
+    const runId = crypto.randomUUID();
     const abortController = new AbortController();
     const isResuming = startFromNodeId === get().pausedAtNodeId;
-    set({ isRunning: true, pausedAtNodeId: null, currentNodeIds: [], _abortController: abortController });
+
+    // Per-run isolated output store: nodeId → output data produced by THIS run
+    const runOutputs = new Map<string, RunNodeOutputs>();
+
+    // Run-specific getConnectedInputs reads from runOutputs first (output isolation)
+    const runGetConnectedInputs = (nodeId: string) => {
+      const { edges: currentEdges, nodes: currentNodes, dimmedNodeIds } = get();
+      return getConnectedInputsPure(nodeId, currentNodes, currentEdges, undefined, dimmedNodeIds, runOutputs);
+    };
+
+    // Run-specific updateNodeData writes to global state (display) AND runOutputs (isolation)
+    const runUpdateNodeData = (nodeId: string, data: Partial<WorkflowNodeData>) => {
+      get().updateNodeData(nodeId, data);
+      // Extract only the output fields relevant to inter-node data passing
+      const existing = runOutputs.get(nodeId) ?? {};
+      const outputFields: RunNodeOutputs = {};
+      if ('outputImage' in data && data.outputImage !== undefined) outputFields.outputImage = data.outputImage as string | null;
+      if ('outputText' in data && data.outputText !== undefined) outputFields.outputText = data.outputText as string | null;
+      if ('outputVideo' in data && data.outputVideo !== undefined) outputFields.outputVideo = data.outputVideo as string | null;
+      if ('outputAudio' in data && data.outputAudio !== undefined) outputFields.outputAudio = data.outputAudio as string | null;
+      if ('output3dUrl' in data && data.output3dUrl !== undefined) outputFields.output3dUrl = data.output3dUrl as string | null;
+      if ('capturedImage' in data && data.capturedImage !== undefined) outputFields.capturedImage = data.capturedImage as string | null;
+      if (Object.keys(outputFields).length > 0) {
+        runOutputs.set(nodeId, { ...existing, ...outputFields });
+      }
+    };
+
+    // Build run-specific execution context
+    const buildRunContext = (node: WorkflowNode, signal?: AbortSignal): NodeExecutionContext => ({
+      node,
+      getConnectedInputs: runGetConnectedInputs,
+      updateNodeData: runUpdateNodeData,
+      getFreshNode: (id: string) => get().nodes.find((n) => n.id === id),
+      getEdges: () => get().edges,
+      getNodes: () => get().nodes,
+      signal,
+      providerSettings: get().providerSettings,
+      addIncurredCost: (cost: number) => get().addIncurredCost(cost),
+      addToGlobalHistory: (item) => get().addToGlobalHistory(item),
+      generationsPath: get().generationsPath,
+      saveDirectoryPath: get().saveDirectoryPath,
+      trackSaveGeneration: (key: string, promise: Promise<void>) => {
+        pendingImageSyncs.set(key, promise);
+        promise.finally(() => pendingImageSyncs.delete(key));
+      },
+      appendOutputGalleryImage: (targetId: string, image: string) => {
+        set((state) => ({
+          nodes: state.nodes.map((n) =>
+            n.id === targetId && n.type === "outputGallery"
+              ? { ...n, data: { ...n.data, images: [image, ...((n.data as OutputGalleryNodeData).images || [])] } as WorkflowNodeData }
+              : n
+          ) as WorkflowNode[],
+          hasUnsavedChanges: true,
+        }));
+      },
+      get: get as () => unknown,
+    });
+
+    // Register this run in activeRuns and update derived state
+    const addRun = () => {
+      const newRuns = new Map(get().activeRuns);
+      newRuns.set(runId, { currentNodeIds: [], abortController });
+      const allNodeIds = [...newRuns.values()].flatMap(r => r.currentNodeIds);
+      set({ activeRuns: newRuns, isRunning: true, pausedAtNodeId: null, currentNodeIds: [...new Set(allNodeIds)] });
+    };
+
+    // Update this run's active nodes and sync global currentNodeIds
+    const setRunCurrentNodes = (nodeIds: string[]) => {
+      const newRuns = new Map(get().activeRuns);
+      const run = newRuns.get(runId);
+      if (run) {
+        run.currentNodeIds = nodeIds;
+        newRuns.set(runId, run);
+        const allNodeIds = [...newRuns.values()].flatMap(r => r.currentNodeIds);
+        set({ activeRuns: newRuns, currentNodeIds: [...new Set(allNodeIds)] });
+      }
+    };
+
+    // Remove this run from activeRuns and sync derived state
+    const removeRun = () => {
+      const newRuns = new Map(get().activeRuns);
+      newRuns.delete(runId);
+      const runs = [...newRuns.values()];
+      const allNodeIds = runs.flatMap(r => r.currentNodeIds);
+      set({
+        activeRuns: newRuns,
+        isRunning: newRuns.size > 0 || get()._abortController !== null,
+        currentNodeIds: [...new Set(allNodeIds)],
+      });
+    };
+
+    addRun();
 
     // Start logging session
     await logger.startSession();
 
     logger.info('workflow.start', 'Workflow execution started', {
+      runId,
       nodeCount: nodes.length,
       edgeCount: edges.length,
       startFromNodeId,
@@ -1078,7 +1187,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         nodeType: node.type,
       });
 
-      const executionCtx = get()._buildExecutionContext(node, signal);
+      const executionCtx = buildRunContext(node, signal);
 
       switch (node.type) {
           case "imageInput":
@@ -1086,9 +1195,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
             break;
           case "audioInput": {
             // If audio is connected from upstream, use it (connection wins over upload)
-            const audioInputs = get().getConnectedInputs(node.id);
+            const audioInputs = runGetConnectedInputs(node.id);
             if (audioInputs.audio.length > 0 && audioInputs.audio[0]) {
-              get().updateNodeData(node.id, { audioFile: audioInputs.audio[0] });
+              runUpdateNodeData(node.id, { audioFile: audioInputs.audio[0] });
             }
             break;
           }
@@ -1156,7 +1265,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
             await executeSwitch(executionCtx);
             break;
           case "conditionalSwitch":
-            await evaluateAndExecuteConditionalSwitch(node, executionCtx, get().getConnectedInputs, get().updateNodeData);
+            await evaluateAndExecuteConditionalSwitch(node, executionCtx, runGetConnectedInputs, runUpdateNodeData);
             break;
         }
     }; // End of executeSingleNode helper
@@ -1165,7 +1274,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       // Execute levels sequentially, but nodes within each level in parallel
       for (let levelIdx = startLevel; levelIdx < levels.length; levelIdx++) {
         // Check if execution was stopped
-        if (abortController.signal.aborted || !get().isRunning) break;
+        if (abortController.signal.aborted) break;
 
         const level = levels[levelIdx];
         const levelNodes = level.nodeIds
@@ -1178,13 +1287,14 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         const batches = chunk(levelNodes, maxConcurrentCalls);
 
         for (const batch of batches) {
-          if (abortController.signal.aborted || !get().isRunning) break;
+          if (abortController.signal.aborted) break;
 
-          // Update currentNodeIds to show which nodes are executing
+          // Update this run's active nodes (merged into global currentNodeIds)
           const batchIds = batch.map((n) => n.id);
-          set({ currentNodeIds: batchIds });
+          setRunCurrentNodes(batchIds);
 
           logger.info('node.execution', `Executing level ${levelIdx} batch`, {
+            runId,
             level: levelIdx,
             nodeCount: batch.length,
             nodeIds: batchIds,
@@ -1202,6 +1312,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
                 !(r.reason instanceof DOMException && r.reason.name === 'AbortError')) {
               const failedNode = batch[i];
               logger.error('workflow.error', 'Node execution failed in parallel batch', {
+                runId,
                 level: levelIdx,
                 nodeId: failedNode.id,
                 nodeType: failedNode.type,
@@ -1215,44 +1326,59 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       }
 
       // Check if we completed or were aborted
-      if (!abortController.signal.aborted && get().isRunning) {
-        logger.info('workflow.end', 'Workflow execution completed successfully');
+      if (!abortController.signal.aborted) {
+        logger.info('workflow.end', 'Workflow execution completed successfully', { runId });
       }
 
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      removeRun();
 
       saveLogSession();
       await logger.endSession();
     } catch (error) {
       // Handle AbortError gracefully (user cancelled)
       if (error instanceof DOMException && error.name === 'AbortError') {
-        logger.info('workflow.end', 'Workflow execution cancelled by user');
+        logger.info('workflow.end', 'Workflow execution cancelled by user', { runId });
       } else {
-        logger.error('workflow.error', 'Workflow execution failed', {}, error instanceof Error ? error : undefined);
+        logger.error('workflow.error', 'Workflow execution failed', { runId }, error instanceof Error ? error : undefined);
         // Show error toast for the failed node
         useToast.getState().show(
           `Workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           "error"
         );
       }
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      removeRun();
 
       saveLogSession();
       await logger.endSession();
     }
   },
 
-  stopWorkflow: () => {
-    // Abort any in-flight requests
-    const controller = get()._abortController;
-    if (controller) {
-      controller.abort("user-cancelled");
+  stopWorkflow: (runId?: string) => {
+    if (runId) {
+      // Stop a specific parallel run
+      const run = get().activeRuns.get(runId);
+      if (run) run.abortController.abort("user-cancelled");
+      const newRuns = new Map(get().activeRuns);
+      newRuns.delete(runId);
+      const runs = [...newRuns.values()];
+      set({
+        activeRuns: newRuns,
+        isRunning: newRuns.size > 0 || get()._abortController !== null,
+        currentNodeIds: [...new Set(runs.flatMap(r => r.currentNodeIds))],
+      });
+    } else {
+      // Stop all runs (workflow runs + any single-node run)
+      for (const run of get().activeRuns.values()) {
+        run.abortController.abort("user-cancelled");
+      }
+      const controller = get()._abortController;
+      if (controller) controller.abort("user-cancelled");
+      set({ activeRuns: new Map(), isRunning: false, currentNodeIds: [], _abortController: null });
     }
-    set({ isRunning: false, currentNodeIds: [], _abortController: null });
   },
 
   setMaxConcurrentCalls: (value: number) => {
-    const clamped = Math.max(1, Math.min(10, value));
+    const clamped = Math.max(1, Math.min(20, value));
     saveConcurrencySetting(clamped);
     set({ maxConcurrentCalls: clamped });
   },
@@ -1302,27 +1428,27 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         await executeSplitGrid(executionCtx);
       } else if (node.type === "videoStitch") {
         await executeVideoStitch(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "easeCurve") {
         await executeEaseCurve(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "videoTrim") {
         await executeVideoTrim(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "videoFrameGrab") {
         await executeVideoFrameGrab(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "output") {
         await executeOutput(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       }
@@ -1352,7 +1478,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       }
 
       logger.info('node.execution', 'Node regeneration completed successfully', { nodeId });
-      set({ isRunning: false, currentNodeIds: [] });
+      clearLegacyRunState(set, get);
 
       saveLogSession();
       await logger.endSession();
@@ -1364,7 +1490,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         status: "error",
         error: error instanceof Error ? error.message : "Regeneration failed",
       });
-      set({ isRunning: false, currentNodeIds: [] });
+      clearLegacyRunState(set, get);
 
       saveLogSession();
       await logger.endSession();
@@ -1395,7 +1521,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       await executeGenerateVideo(executionCtx, { useStoredFallback: true, action: "extend" });
 
       logger.info('node.execution', 'Video extension completed successfully', { nodeId });
-      set({ isRunning: false, currentNodeIds: [] });
+      clearLegacyRunState(set, get);
 
       saveLogSession();
       await logger.endSession();
@@ -1405,7 +1531,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         status: "error",
         error: error instanceof Error ? error.message : "Video extension failed",
       });
-      set({ isRunning: false, currentNodeIds: [] });
+      clearLegacyRunState(set, get);
 
       saveLogSession();
       await logger.endSession();
@@ -1623,7 +1749,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       }
 
       logger.info('node.execution', 'Selected nodes execution completed successfully');
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      clearLegacyRunState(set, get, { _abortController: null });
 
       saveLogSession();
       await logger.endSession();
@@ -1637,7 +1763,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           "error"
         );
       }
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      clearLegacyRunState(set, get, { _abortController: null });
 
       saveLogSession();
       await logger.endSession();
@@ -1814,6 +1940,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       groups: {},
       isRunning: false,
       currentNodeIds: [],
+      activeRuns: new Map(),
+      _abortController: null,
       // Reset auto-save state when clearing workflow
       workflowId: null,
       workflowName: null,

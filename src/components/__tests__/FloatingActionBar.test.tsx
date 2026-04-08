@@ -75,6 +75,7 @@ const defaultProviderSettings: ProviderSettings = {
 const createDefaultState = (overrides = {}) => ({
   nodes: [],
   isRunning: false,
+  activeRuns: new Map(),
   currentNodeIds: [],
   executeWorkflow: mockExecuteWorkflow,
   regenerateNode: mockRegenerateNode,
