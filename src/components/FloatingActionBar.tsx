@@ -14,6 +14,7 @@ const ALL_NODES_CATEGORIES: { label: string; nodes: { type: NodeType; label: str
     nodes: [
       { type: "imageInput", label: "Image Input" },
       { type: "audioInput", label: "Audio Input" },
+      { type: "videoInput", label: "Video Input" },
       { type: "glbViewer", label: "3D Viewer" },
     ],
   },
@@ -40,6 +41,7 @@ const ALL_NODES_CATEGORIES: { label: string; nodes: { type: NodeType; label: str
     nodes: [
       { type: "annotation", label: "Annotate" },
       { type: "imageUpscaler", label: "Image Upscaler" },
+      { type: "videoUpscaler", label: "Video Upscaler" },
       { type: "splitGrid", label: "Split Grid" },
       { type: "videoStitch", label: "Video Stitch" },
       { type: "videoTrim", label: "Video Trim" },

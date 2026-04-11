@@ -31,6 +31,9 @@ export type { GenerateVideoOptions } from "./generateVideoExecutor";
 export { executeImageUpscaler } from "./imageUpscalerExecutor";
 export type { ImageUpscalerOptions } from "./imageUpscalerExecutor";
 
+export { executeVideoUpscaler } from "./videoUpscalerExecutor";
+export type { VideoUpscalerOptions } from "./videoUpscalerExecutor";
+
 export { executeGenerate3D } from "./generate3dExecutor";
 export type { Generate3DOptions } from "./generate3dExecutor";
 

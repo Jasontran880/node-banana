@@ -16,6 +16,7 @@ export type ModelCapability =
   | "image-to-image"
   | "text-to-video"
   | "image-to-video"
+  | "video-to-video"
   | "text-to-3d"
   | "image-to-3d"
   | "text-to-audio";
@@ -89,6 +90,8 @@ export interface GenerationInput {
   prompt: string;
   /** Input images as base64 data URLs or HTTP URLs */
   images?: string[];
+  /** Input videos as base64 data URLs or HTTP URLs */
+  videos?: string[];
   /** Model-specific parameters (varies by provider/model) */
   parameters?: Record<string, unknown>;
   /** Dynamic inputs mapped from schema (e.g., { "image_url": "data:...", "tail_image_url": "data:..." }) */

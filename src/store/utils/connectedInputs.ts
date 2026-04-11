@@ -10,6 +10,8 @@ import {
   WorkflowEdge,
   ImageInputNodeData,
   AudioInputNodeData,
+  VideoInputNodeData,
+  VideoUpscalerNodeData,
   AnnotationNodeData,
   NanoBananaNodeData,
   GenerateVideoNodeData,
@@ -90,6 +92,10 @@ function getSourceOutput(
     return { type: "image", value: (sourceNode.data as ImageInputNodeData).image };
   } else if (sourceNode.type === "audioInput") {
     return { type: "audio", value: (sourceNode.data as AudioInputNodeData).audioFile };
+  } else if (sourceNode.type === "videoInput") {
+    return { type: "video", value: (sourceNode.data as VideoInputNodeData).videoFile };
+  } else if (sourceNode.type === "videoUpscaler") {
+    return { type: "video", value: (runData?.outputVideo ?? (sourceNode.data as VideoUpscalerNodeData).outputVideo) ?? null };
   } else if (sourceNode.type === "annotation") {
     return { type: "image", value: (runData?.outputImage ?? (sourceNode.data as AnnotationNodeData).outputImage) ?? null };
   } else if (sourceNode.type === "imageUpscaler") {

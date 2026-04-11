@@ -238,6 +238,67 @@ export function detectImageType(buffer: Buffer): { mimeType: string; ext: string
 }
 
 /**
+ * Upload a base64 video to Kie.ai and get a URL.
+ * Used for video-to-video models (e.g. Topaz video upscale).
+ */
+export async function uploadVideoToKie(
+  requestId: string,
+  apiKey: string,
+  base64Video: string
+): Promise<string> {
+  let mimeType = "video/mp4";
+  let videoData = base64Video;
+
+  if (base64Video.startsWith("data:")) {
+    const matches = base64Video.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      mimeType = matches[1];
+      videoData = matches[2];
+    }
+  }
+
+  const binaryData = Buffer.from(videoData, "base64");
+  const ext = mimeType.includes("webm") ? "webm" : mimeType.includes("mov") ? "mov" : "mp4";
+  const filename = `upload_${Date.now()}.${ext}`;
+  const dataUrl = `data:${mimeType};base64,${videoData}`;
+
+  console.log(`[API:${requestId}] Uploading video to Kie.ai: ${filename} (${(binaryData.length / (1024 * 1024)).toFixed(1)}MB)`);
+
+  const response = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      base64Data: dataUrl,
+      uploadPath: "videos",
+      fileName: filename,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to upload video: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[API:${requestId}] Kie video upload response:`, JSON.stringify(result).substring(0, 300));
+
+  if (result.code && result.code !== 200 && !result.success) {
+    throw new Error(`Video upload failed: ${result.msg || 'Unknown error'}`);
+  }
+
+  const downloadUrl = result.data?.downloadUrl || result.data?.url || result.downloadUrl || result.url;
+  if (!downloadUrl) {
+    throw new Error(`No download URL in video upload response. Response: ${JSON.stringify(result).substring(0, 200)}`);
+  }
+
+  console.log(`[API:${requestId}] Video uploaded: ${downloadUrl.substring(0, 80)}...`);
+  return downloadUrl;
+}
+
+/**
  * Upload a base64 image to Kie.ai and get a URL
  * Required for image-to-image models since Kie doesn't accept base64 directly
  * Uses base64 upload endpoint (same as official Kie client)
@@ -601,7 +662,12 @@ export async function generateWithKie(
     for (const [key, value] of Object.entries(input.dynamicInputs)) {
       if (value !== null && value !== undefined && value !== '') {
         // Check if this is an image input that needs uploading
-        if (typeof value === 'string' && value.startsWith('data:image')) {
+        if (typeof value === 'string' && value.startsWith('data:video')) {
+          // Video data URL - upload to Kie
+          const url = await uploadVideoToKie(requestId, apiKey, value);
+          inputParams[key] = url;
+          handledImageKeys.add(key);
+        } else if (typeof value === 'string' && value.startsWith('data:image')) {
           // Single data URL - upload it
           const url = await uploadImageToKie(requestId, apiKey, value);
           // Singular keys get a string, plural keys get an array
@@ -638,6 +704,18 @@ export async function generateWithKie(
         }
       }
     }
+  }
+
+  // Handle video inputs (for video-to-video models like Topaz video upscale)
+  if (input.videos && input.videos.length > 0 && !handledImageKeys.has("video_url")) {
+    const videoData = input.videos[0];
+    if (videoData.startsWith("http")) {
+      inputParams["video_url"] = videoData;
+    } else {
+      const url = await uploadVideoToKie(requestId, apiKey, videoData);
+      inputParams["video_url"] = url;
+    }
+    handledImageKeys.add("video_url");
   }
 
   // Handle image inputs (fallback - only if dynamicInputs didn't already set the image key)

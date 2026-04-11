@@ -73,6 +73,7 @@ import {
   executeNanoBanana,
   executeGenerateVideo,
   executeImageUpscaler,
+  executeVideoUpscaler,
   executeGenerate3D,
   executeGenerateAudio,
   executeLlmGenerate,
@@ -1191,6 +1192,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
       switch (node.type) {
           case "imageInput":
+          case "videoInput":
             // Data source node - no execution needed
             break;
           case "audioInput": {
@@ -1221,6 +1223,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
             break;
           case "imageUpscaler":
             await executeImageUpscaler(executionCtx);
+            break;
+          case "videoUpscaler":
+            await executeVideoUpscaler(executionCtx);
             break;
           case "generateVideo":
             await executeGenerateVideo(executionCtx);
@@ -1414,6 +1419,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         await executeNanoBanana(executionCtx, regenOptions);
       } else if (node.type === "imageUpscaler") {
         await executeImageUpscaler(executionCtx, regenOptions);
+      } else if (node.type === "videoUpscaler") {
+        await executeVideoUpscaler(executionCtx, regenOptions);
       } else if (node.type === "array") {
         await executeArray(executionCtx);
       } else if (node.type === "llmGenerate") {
@@ -1589,6 +1596,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       switch (node.type) {
         case "imageInput":
         case "audioInput":
+        case "videoInput":
           // Data source nodes - no execution needed
           break;
         case "glbViewer":
@@ -1611,6 +1619,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           break;
         case "imageUpscaler":
           await executeImageUpscaler(executionCtx, regenOptions);
+          break;
+        case "videoUpscaler":
+          await executeVideoUpscaler(executionCtx, regenOptions);
           break;
         case "generateVideo":
           await executeGenerateVideo(executionCtx, regenOptions);

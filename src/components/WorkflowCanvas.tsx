@@ -25,6 +25,7 @@ import dynamic from "next/dynamic";
 import {
   ImageInputNode,
   AudioInputNode,
+  VideoInputNode,
   AnnotationNode,
   PromptNode,
   ArrayNode,
@@ -46,6 +47,7 @@ import {
   SwitchNode,
   ConditionalSwitchNode,
   ImageUpscalerNode,
+  VideoUpscalerNode,
 } from "./nodes";
 
 // Lazy-load GLBViewerNode to avoid bundling three.js for users who don't use 3D nodes
@@ -78,6 +80,7 @@ import { useAnnotationStore } from "@/store/annotationStore";
 const nodeTypes: NodeTypes = {
   imageInput: ImageInputNode,
   audioInput: AudioInputNode,
+  videoInput: VideoInputNode,
   annotation: AnnotationNode,
   prompt: PromptNode,
   array: ArrayNode,
@@ -99,6 +102,7 @@ const nodeTypes: NodeTypes = {
   switch: SwitchNode,
   conditionalSwitch: ConditionalSwitchNode,
   imageUpscaler: ImageUpscalerNode,
+  videoUpscaler: VideoUpscalerNode,
   glbViewer: GLBViewerNode,
 };
 
@@ -139,6 +143,8 @@ const getNodeHandles = (nodeType: string): { inputs: string[]; outputs: string[]
       return { inputs: ["reference"], outputs: ["image"] };
     case "audioInput":
       return { inputs: ["audio"], outputs: ["audio"] };
+    case "videoInput":
+      return { inputs: [], outputs: ["video"] };
     case "annotation":
       return { inputs: ["image"], outputs: ["image"] };
     case "prompt":
@@ -151,6 +157,8 @@ const getNodeHandles = (nodeType: string): { inputs: string[]; outputs: string[]
       return { inputs: ["image", "text"], outputs: ["image"] };
     case "imageUpscaler":
       return { inputs: ["image"], outputs: ["image"] };
+    case "videoUpscaler":
+      return { inputs: ["video"], outputs: ["video"] };
     case "generateVideo":
       return { inputs: ["image", "text"], outputs: ["video"] };
     case "generate3d":
@@ -364,12 +372,14 @@ export function WorkflowCanvas() {
   const NODE_TITLES: Record<string, string> = {
     imageInput: 'Image Input',
     audioInput: 'Audio Input',
+    videoInput: 'Video Input',
     annotation: 'Annotation',
     prompt: 'Prompt',
     array: 'Array',
     promptConstructor: 'Prompt Constructor',
     nanoBanana: 'Generate Image',
     imageUpscaler: 'Image Upscaler',
+    videoUpscaler: 'Video Upscaler',
     generateVideo: 'Generate Video',
     generate3d: 'Generate 3D',
     generateAudio: 'Generate Audio',
@@ -1164,7 +1174,14 @@ export function WorkflowCanvas() {
           sourceHandleIdForNewNode = "text";
         }
       } else if (handleType === "video") {
-        if (nodeType === "videoStitch") {
+        if (nodeType === "videoInput") {
+          // VideoInput is a source-only node for videos
+          sourceHandleIdForNewNode = "video";
+        } else if (nodeType === "videoUpscaler") {
+          // VideoUpscaler accepts video input and outputs video
+          targetHandleId = "video";
+          sourceHandleIdForNewNode = "video";
+        } else if (nodeType === "videoStitch") {
           // VideoStitch has dynamic video-N inputs and a video output
           targetHandleId = "video-0";
           sourceHandleIdForNewNode = "video";
@@ -1457,6 +1474,7 @@ export function WorkflowCanvas() {
           const defaultDimensions: Record<NodeType, { width: number; height: number }> = {
             imageInput: { width: 300, height: 280 },
             audioInput: { width: 300, height: 200 },
+            videoInput: { width: 300, height: 220 },
             annotation: { width: 300, height: 280 },
             prompt: { width: 320, height: 220 },
             array: { width: 360, height: 360 },
@@ -1478,6 +1496,7 @@ export function WorkflowCanvas() {
             switch: { width: 220, height: 120 },
             conditionalSwitch: { width: 260, height: 180 },
             imageUpscaler: { width: 300, height: 300 },
+            videoUpscaler: { width: 300, height: 300 },
             glbViewer: { width: 360, height: 380 },
           };
           const dims = defaultDimensions[nodeType];
@@ -1830,6 +1849,45 @@ export function WorkflowCanvas() {
         return;
       }
 
+      // Handle video files
+      const videoFiles = allFiles.filter((file) => file.type.startsWith("video/"));
+      if (videoFiles.length > 0) {
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        videoFiles.forEach((file, index) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            const nodeId = addNode("videoInput", {
+              x: position.x + index * 320,
+              y: position.y,
+            });
+            const video = document.createElement("video");
+            video.onloadedmetadata = () => {
+              updateNodeData(nodeId, {
+                videoFile: dataUrl,
+                filename: file.name,
+                format: file.type,
+                duration: video.duration,
+              });
+            };
+            video.onerror = () => {
+              updateNodeData(nodeId, {
+                videoFile: dataUrl,
+                filename: file.name,
+                format: file.type,
+                duration: null,
+              });
+            };
+            video.src = dataUrl;
+          };
+          reader.readAsDataURL(file);
+        });
+        return;
+      }
+
       // Handle audio files
       const audioFiles = allFiles.filter((file) => file.type.startsWith("audio/"));
       if (audioFiles.length > 0) {
@@ -2044,6 +2102,8 @@ export function WorkflowCanvas() {
                 return "#3b82f6";
               case "audioInput":
                 return "#a78bfa";
+              case "videoInput":
+                return "#7c3aed"; // violet-700
               case "annotation":
                 return "#8b5cf6";
               case "prompt":
@@ -2056,6 +2116,8 @@ export function WorkflowCanvas() {
                 return "#22c55e";
               case "imageUpscaler":
                 return "#06b6d4"; // cyan-500 (upscaling/enhancement)
+              case "videoUpscaler":
+                return "#7c3aed"; // violet-700 (video upscaling)
               case "generateVideo":
                 return "#9333ea";
               case "generate3d":
