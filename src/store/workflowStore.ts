@@ -733,14 +733,19 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
     const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
 
-    // Copy edges that connect selected nodes to each other
-    const connectedEdges = edges.filter(
+    // Edges between selected nodes (both endpoints being pasted)
+    const internalEdges = edges.filter(
       (edge) => selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
     );
 
-    // Deep clone the nodes and edges to avoid reference issues
+    // Incoming edges from non-selected nodes (source stays, target gets a new ID on paste)
+    const externalIncomingEdges = edges.filter(
+      (edge) => !selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+    );
+
+    // Deep clone to avoid reference issues
     const clonedNodes = JSON.parse(JSON.stringify(selectedNodes)) as WorkflowNode[];
-    const clonedEdges = JSON.parse(JSON.stringify(connectedEdges)) as WorkflowEdge[];
+    const clonedEdges = JSON.parse(JSON.stringify([...internalEdges, ...externalIncomingEdges])) as WorkflowEdge[];
 
     set({ clipboard: { nodes: clonedNodes, edges: clonedEdges } });
   },
@@ -780,13 +785,18 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       };
     });
 
-    // Create new edges with updated source/target IDs
-    const newEdges: WorkflowEdge[] = clipboard.edges.map((edge) => ({
-      ...edge,
-      id: `edge-${idMapping.get(edge.source)}-${idMapping.get(edge.target)}-${edge.sourceHandle || "default"}-${edge.targetHandle || "default"}`,
-      source: idMapping.get(edge.source)!,
-      target: idMapping.get(edge.target)!,
-    }));
+    // Create new edges, handling both internal (both endpoints pasted) and
+    // external incoming (source is an existing canvas node, target is pasted).
+    const newEdges: WorkflowEdge[] = clipboard.edges.map((edge) => {
+      const newSource = idMapping.get(edge.source) ?? edge.source; // keep original if external
+      const newTarget = idMapping.get(edge.target) ?? edge.target;
+      return {
+        ...edge,
+        id: `edge-${newSource}-${newTarget}-${edge.sourceHandle || "default"}-${edge.targetHandle || "default"}`,
+        source: newSource,
+        target: newTarget,
+      };
+    });
 
     // Deselect existing nodes and add new ones
     const updatedNodes = nodes.map((node) => ({
