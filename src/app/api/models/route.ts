@@ -308,7 +308,7 @@ const KIE_MODELS: ProviderModel[] = [
     name: "Topaz Video Upscale",
     description: "AI video upscaling. Supports 1x, 2x, and 4x scaling factors.",
     provider: "kie",
-    capabilities: ["image-to-video"],
+    capabilities: ["video-to-video"],
     coverImage: undefined,
     pageUrl: "https://kie.ai/topaz",
   },
@@ -509,6 +509,15 @@ const MUAPI_MODELS: ProviderModel[] = [
     coverImage: undefined,
     pricing: { type: "per-second", amount: 0.08, currency: "USD" },
     pageUrl: "https://muapi.ai/playground/seedance-v2.0-i2v",
+  },
+  {
+    id: "topaz-video-upscale",
+    name: "Topaz Video Upscale",
+    description: "AI video upscaling using Topaz Labs technology via MuAPI. Enhance resolution 1×, 2×, or 4× with crisp detail preservation.",
+    provider: "muapi",
+    capabilities: ["video-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://muapi.ai/playground/topaz-video-upscale",
   },
 ];
 

@@ -77,6 +77,61 @@ async function uploadImageToMuapi(
 }
 
 /**
+ * Upload a base64 video to mu-api's file upload endpoint and get a public URL.
+ */
+async function uploadVideoToMuapi(
+  requestId: string,
+  apiKey: string,
+  base64Video: string
+): Promise<string> {
+  let videoData = base64Video;
+  let mimeType = "video/mp4";
+
+  if (base64Video.startsWith("data:")) {
+    const matches = base64Video.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      mimeType = matches[1];
+      videoData = matches[2];
+    }
+  }
+
+  const binaryData = Buffer.from(videoData, "base64");
+  const ext = mimeType.split("/")[1]?.split(";")[0] || "mp4";
+  const filename = `upload_${Date.now()}.${ext}`;
+
+  console.log(
+    `[API:${requestId}] Uploading video to mu-api: ${filename} (${(binaryData.length / (1024 * 1024)).toFixed(1)}MB, ${mimeType})`
+  );
+
+  const formData = new FormData();
+  const blob = new Blob([binaryData], { type: mimeType });
+  formData.append("file", blob, filename);
+
+  const response = await fetch(`${MUAPI_BASE}/upload_file`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to upload video to mu-api: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  const url = result.url;
+
+  if (!url) {
+    throw new Error(`No URL in mu-api upload response. Response: ${JSON.stringify(result).substring(0, 200)}`);
+  }
+
+  console.log(`[API:${requestId}] Video uploaded to mu-api: ${url.substring(0, 80)}...`);
+  return url;
+}
+
+/**
  * Poll mu-api prediction status until completion.
  * GET /api/v1/predictions/{request_id}/result
  */
@@ -149,6 +204,104 @@ async function pollMuapiCompletion(
 }
 
 /**
+ * Handle Topaz video upscale via mu-api.
+ * POST /topaz-video-upscale → poll GET /predictions/{id}/result
+ */
+async function generateTopazVideoUpscale(
+  requestId: string,
+  apiKey: string,
+  input: GenerationInput
+): Promise<GenerationOutput> {
+  // Get video source — prefer videos array, fall back to dynamicInputs
+  const videoSource =
+    input.videos?.[0] ||
+    (typeof input.dynamicInputs?.video_url === "string" ? input.dynamicInputs.video_url : undefined);
+
+  if (!videoSource) {
+    return { success: false, error: "topaz-video-upscale requires a video input" };
+  }
+
+  // Upload if base64; use URL directly if already hosted
+  let videoUrl: string;
+  if (videoSource.startsWith("data:") || (!videoSource.startsWith("http") && videoSource.length > 500)) {
+    videoUrl = await uploadVideoToMuapi(requestId, apiKey, videoSource);
+  } else {
+    videoUrl = videoSource;
+  }
+
+  const upscaleFactor = input.parameters?.upscale_factor !== undefined
+    ? Number(input.parameters.upscale_factor)
+    : 2;
+
+  const body = { video_url: videoUrl, upscale_factor: upscaleFactor };
+
+  console.log(`[API:${requestId}] mu-api topaz-video-upscale: ${JSON.stringify({ video_url: videoUrl.substring(0, 60) + "...", upscale_factor: upscaleFactor })}`);
+
+  const createResponse = await fetch(`${MUAPI_BASE}/topaz-video-upscale`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!createResponse.ok) {
+    const errorText = await createResponse.text();
+    let errorDetail = errorText;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorDetail = errorJson.message || errorJson.error || errorJson.detail || errorText;
+    } catch { /* keep raw text */ }
+    return { success: false, error: `Topaz Video Upscale: ${errorDetail}` };
+  }
+
+  const createResult = await createResponse.json();
+  const predictionId = createResult.request_id;
+
+  if (!predictionId) {
+    return { success: false, error: "No request_id in mu-api topaz-video-upscale response" };
+  }
+
+  console.log(`[API:${requestId}] mu-api topaz task created: ${predictionId}`);
+
+  const pollResult = await pollMuapiCompletion(requestId, apiKey, predictionId);
+
+  if (!pollResult.success) {
+    return { success: false, error: `Topaz Video Upscale: ${pollResult.error}` };
+  }
+
+  const mediaUrl = pollResult.videoUrl!;
+
+  const mediaUrlCheck = validateMediaUrl(mediaUrl);
+  if (!mediaUrlCheck.valid) {
+    return { success: false, error: `Invalid media URL: ${mediaUrlCheck.error}` };
+  }
+
+  console.log(`[API:${requestId}] Fetching topaz output: ${mediaUrl.substring(0, 80)}...`);
+  const mediaResponse = await fetch(mediaUrl);
+  if (!mediaResponse.ok) {
+    return { success: false, error: `Failed to fetch output: ${mediaResponse.status}` };
+  }
+
+  const contentType = mediaResponse.headers.get("content-type") || "video/mp4";
+  const mediaArrayBuffer = await mediaResponse.arrayBuffer();
+  const mediaSizeMB = mediaArrayBuffer.byteLength / (1024 * 1024);
+
+  console.log(`[API:${requestId}] Topaz output: ${contentType}, ${mediaSizeMB.toFixed(2)}MB`);
+
+  if (mediaSizeMB > 20) {
+    return { success: true, outputs: [{ type: "video", data: "", url: mediaUrl }] };
+  }
+
+  const mediaBase64 = Buffer.from(mediaArrayBuffer).toString("base64");
+  return {
+    success: true,
+    outputs: [{ type: "video", data: `data:${contentType};base64,${mediaBase64}`, url: mediaUrl }],
+  };
+}
+
+/**
  * Generate video using mu-api.
  */
 export async function generateWithMuapi(
@@ -157,6 +310,11 @@ export async function generateWithMuapi(
   input: GenerationInput
 ): Promise<GenerationOutput> {
   const modelId = input.model.id;
+
+  // Route topaz upscale to its own handler
+  if (modelId === "topaz-video-upscale") {
+    return generateTopazVideoUpscale(requestId, apiKey, input);
+  }
 
   console.log(
     `[API:${requestId}] mu-api generation - Model: ${modelId}, Images: ${input.images?.length || 0}, Prompt: ${input.prompt.length} chars`

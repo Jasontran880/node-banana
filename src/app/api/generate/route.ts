@@ -36,6 +36,8 @@ interface MultiProviderGenerateRequest extends GenerateRequest {
   parameters?: Record<string, unknown>;
   /** Dynamic inputs from schema-based connections (e.g., image_url, tail_image_url, prompt) */
   dynamicInputs?: Record<string, string | string[]>;
+  /** Input videos as base64 data URLs or HTTP URLs (for video-to-video models) */
+  videos?: string[];
   /** "extend" triggers Veo video extension instead of fresh generation */
   action?: "extend";
   /** Google-hosted video URI from a prior Veo generation; required when action="extend" for Gemini Veo */
@@ -107,6 +109,7 @@ export async function POST(request: NextRequest) {
       selectedModel,
       parameters,
       dynamicInputs,
+      videos,
       mediaType,
       action,
       veoVideoUri,
@@ -117,6 +120,7 @@ export async function POST(request: NextRequest) {
     // - Provided via dynamicInputs
     // - Images are provided (image-to-video/image-to-image models)
     // - Dynamic inputs contain image frames (first_frame, last_frame, etc.)
+    // - Videos are provided (video-to-video models like Topaz video upscale)
     const hasPrompt = prompt || (dynamicInputs && (
       typeof dynamicInputs.prompt === 'string'
         ? dynamicInputs.prompt
@@ -126,8 +130,11 @@ export async function POST(request: NextRequest) {
     const hasImageInputs = dynamicInputs && Object.keys(dynamicInputs).some(key =>
       key.includes('frame') || key.includes('image')
     );
+    const hasVideos = (videos && videos.length > 0) || (dynamicInputs && Object.keys(dynamicInputs).some(key =>
+      key === 'video_url' || key.includes('video')
+    ));
 
-    if (!hasPrompt && !hasImages && !hasImageInputs) {
+    if (!hasPrompt && !hasImages && !hasImageInputs && !hasVideos) {
       return NextResponse.json<GenerateResponse>(
         {
           success: false,
@@ -398,6 +405,7 @@ export async function POST(request: NextRequest) {
         },
         prompt: prompt || "",
         images: processedImages,
+        videos: videos ? [...videos] : undefined,
         parameters,
         dynamicInputs: processedDynamicInputs,
       };
@@ -485,6 +493,7 @@ export async function POST(request: NextRequest) {
         },
         prompt: prompt || "",
         images: processedImages,
+        videos: videos ? [...videos] : undefined,
         parameters,
         dynamicInputs: processedDynamicInputs,
       };

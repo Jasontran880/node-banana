@@ -25,6 +25,7 @@ import type { LLMProvider, LLMModelType, SelectedModel, ProviderType } from "./p
 export type NodeType =
   | "imageInput"
   | "audioInput"
+  | "videoInput"
   | "annotation"
   | "prompt"
   | "array"
@@ -46,6 +47,7 @@ export type NodeType =
   | "conditionalSwitch"
   | "generate3d"
   | "imageUpscaler"
+  | "videoUpscaler"
   | "glbViewer";
 
 /**
@@ -71,6 +73,16 @@ export interface AudioInputNodeData extends BaseNodeData {
   filename: string | null;       // Original filename for display
   duration: number | null;       // Duration in seconds
   format: string | null;         // MIME type (audio/mp3, audio/wav, etc.)
+}
+
+/**
+ * Video input node - loads/uploads video files into the workflow
+ */
+export interface VideoInputNodeData extends BaseNodeData {
+  videoFile: string | null;      // Base64 data URL of the video file
+  filename: string | null;       // Original filename for display
+  duration: number | null;       // Duration in seconds
+  format: string | null;         // MIME type (video/mp4, video/webm, etc.)
 }
 
 /**
@@ -450,6 +462,18 @@ export interface ImageUpscalerNodeData extends BaseNodeData {
 }
 
 /**
+ * Video Upscaler node - AI video upscaling via Kie.ai or MuAPI (Topaz)
+ */
+export interface VideoUpscalerNodeData extends BaseNodeData {
+  inputVideo: string | null;
+  outputVideo: string | null;
+  upscaleFactor: "1" | "2" | "4";
+  selectedProvider: "kie" | "muapi";
+  status: NodeStatus;
+  error: string | null;
+}
+
+/**
  * GLB 3D Viewer node - loads and displays 3D models, captures viewport as image
  */
 export interface GLBViewerNodeData extends BaseNodeData {
@@ -464,6 +488,7 @@ export interface GLBViewerNodeData extends BaseNodeData {
 export type WorkflowNodeData =
   | ImageInputNodeData
   | AudioInputNodeData
+  | VideoInputNodeData
   | AnnotationNodeData
   | PromptNodeData
   | ArrayNodeData
@@ -485,6 +510,7 @@ export type WorkflowNodeData =
   | SwitchNodeData
   | ConditionalSwitchNodeData
   | ImageUpscalerNodeData
+  | VideoUpscalerNodeData
   | GLBViewerNodeData;
 
 /**
