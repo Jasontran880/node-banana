@@ -67,8 +67,9 @@ export async function generateWithGemini(
     responseModalities: ["IMAGE", "TEXT"],
   };
 
-  // Add imageConfig for both models (both support aspect ratio)
-  if (aspectRatio) {
+  // Add imageConfig for both models (both support aspect ratio).
+  // "auto" means let the model infer — omit the field entirely.
+  if (aspectRatio && aspectRatio !== "auto") {
     config.imageConfig = {
       aspectRatio,
     };

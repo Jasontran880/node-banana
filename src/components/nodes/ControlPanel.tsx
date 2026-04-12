@@ -36,11 +36,11 @@ const GENERATION_NODE_TYPES: NodeType[] = [
   "llmGenerate",
 ];
 
-// Base 10 aspect ratios (all Gemini image models)
-const BASE_ASPECT_RATIOS: AspectRatio[] = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
+// Base 10 aspect ratios (all Gemini image models) — "auto" lets the model infer from context
+const BASE_ASPECT_RATIOS: AspectRatio[] = ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
 
 // Extended 14 aspect ratios (Nano Banana 2 adds extreme ratios)
-const EXTENDED_ASPECT_RATIOS: AspectRatio[] = ["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
+const EXTENDED_ASPECT_RATIOS: AspectRatio[] = ["auto", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
 
 // Resolutions per model
 const RESOLUTIONS_PRO: Resolution[] = ["1K", "2K", "4K"];
@@ -438,12 +438,12 @@ function GenerateImageControls({ node }: { node: Node }) {
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">Aspect Ratio</label>
               <select
-                value={nodeData.aspectRatio || "1:1"}
+                value={nodeData.aspectRatio || "auto"}
                 onChange={handleAspectRatioChange}
                 className="nodrag nopan w-full px-2 py-1 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 {aspectRatios.map(ar => (
-                  <option key={ar} value={ar}>{ar}</option>
+                  <option key={ar} value={ar}>{ar === "auto" ? "Auto" : ar}</option>
                 ))}
               </select>
             </div>
