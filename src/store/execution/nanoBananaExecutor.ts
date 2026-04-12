@@ -156,13 +156,15 @@ export async function executeNanoBanana(
         model: nodeData.model,
       });
 
-      // Add to node's carousel history
+      // Add to node's carousel history (include inline data so navigation
+      // works immediately without requiring a generationsPath disk fetch)
       const newHistoryItem = {
         id: imageId,
         timestamp,
         prompt: promptText,
         aspectRatio: nodeData.aspectRatio,
         model: nodeData.model,
+        data: result.image,
       };
       const updatedHistory = [newHistoryItem, ...(nodeData.imageHistory || [])].slice(0, 50);
 

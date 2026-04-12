@@ -150,6 +150,9 @@ export interface CarouselImageItem {
   prompt: string;
   aspectRatio: AspectRatio;
   model: ModelType;
+  /** Inline image data (base64 data URL). Present when generationsPath is unset
+   *  or as a fast-path cache so carousel navigation never requires a disk fetch. */
+  data?: string;
 }
 
 /**

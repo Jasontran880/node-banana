@@ -348,6 +348,12 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     }
   }, [generationsPath]);
 
+  /** Load a carousel item: use inline data if present, otherwise fetch from disk. */
+  const loadCarouselImage = useCallback(async (imageItem: { id: string; data?: string }) => {
+    if (imageItem.data) return imageItem.data;
+    return loadImageById(imageItem.id);
+  }, [loadImageById]);
+
   const handleCarouselPrevious = useCallback(async () => {
     const history = nodeData.imageHistory || [];
     if (history.length === 0 || isLoadingCarouselImage) return;
@@ -357,7 +363,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     const imageItem = history[newIndex];
 
     setIsLoadingCarouselImage(true);
-    const image = await loadImageById(imageItem.id);
+    const image = await loadCarouselImage(imageItem);
     setIsLoadingCarouselImage(false);
 
     if (image) {
@@ -366,7 +372,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         selectedHistoryIndex: newIndex,
       });
     }
-  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadImageById, updateNodeData]);
+  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadCarouselImage, updateNodeData]);
 
   const handleCarouselNext = useCallback(async () => {
     const history = nodeData.imageHistory || [];
@@ -377,7 +383,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     const imageItem = history[newIndex];
 
     setIsLoadingCarouselImage(true);
-    const image = await loadImageById(imageItem.id);
+    const image = await loadCarouselImage(imageItem);
     setIsLoadingCarouselImage(false);
 
     if (image) {
@@ -386,7 +392,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         selectedHistoryIndex: newIndex,
       });
     }
-  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadImageById, updateNodeData]);
+  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadCarouselImage, updateNodeData]);
 
   // Handle model selection from browse dialog
   const handleBrowseModelSelect = useCallback((model: ProviderModel) => {
