@@ -14,6 +14,8 @@ interface BaseNodeProps {
   selected?: boolean;
   isExecuting?: boolean;
   hasError?: boolean;
+  /** When true, shows a subtle red ring indicating a required input (e.g. prompt) is missing */
+  missingInput?: boolean;
   className?: string;
   contentClassName?: string;
   minWidth?: number;
@@ -61,6 +63,7 @@ export function BaseNode({
   selected = false,
   isExecuting = false,
   hasError = false,
+  missingInput = false,
   className = "",
   contentClassName,
   minWidth = 180,
@@ -310,6 +313,7 @@ export function BaseNode({
           ${fullBleed && selected && !settingsExpanded ? "ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
           ${!fullBleed && selected && !settingsExpanded ? "border-blue-500 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/25" : ""}
           ${!fullBleed && selected && settingsExpanded ? "border-blue-500" : ""}
+          ${missingInput && !selected && !hasError && !isCurrentlyExecuting && !isExecuting ? (fullBleed ? "ring-1 ring-red-500/30" : "border-red-500/50") : ""}
           ${className}
         `}
         onMouseEnter={(e) => {

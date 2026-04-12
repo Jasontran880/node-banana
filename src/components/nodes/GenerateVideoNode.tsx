@@ -66,6 +66,16 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     return () => { browseRegistry.unregister(id); };
   }, [id]);
 
+  // Detect missing prompt: no text edge connected AND no inputPrompt stored
+  const missingPrompt = useWorkflowStore(
+    useCallback((state) => {
+      const hasTextEdge = state.edges.some(
+        (e) => e.target === id && typeof e.targetHandle === "string" && e.targetHandle.startsWith("text")
+      );
+      return !hasTextEdge && !nodeData.inputPrompt;
+    }, [id, nodeData.inputPrompt])
+  );
+
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "fal";
 
   // Get enabled providers
@@ -412,6 +422,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       selected={selected}
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
+      missingInput={missingPrompt}
       fullBleed
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputVideo}

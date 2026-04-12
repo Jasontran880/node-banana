@@ -75,6 +75,14 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     return () => { browseRegistry.unregister(id); };
   }, [id]);
 
+  // Detect missing prompt: no text edge connected AND no inputPrompt stored
+  const missingPrompt = useWorkflowStore(
+    useCallback((state) => {
+      const hasTextEdge = state.edges.some((e) => e.target === id && e.targetHandle === "text");
+      return !hasTextEdge && !nodeData.inputPrompt;
+    }, [id, nodeData.inputPrompt])
+  );
+
   // Get the current selected provider (default to gemini)
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "gemini";
 
@@ -512,6 +520,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       selected={selected}
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
+      missingInput={missingPrompt}
       fullBleed
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputImage}
