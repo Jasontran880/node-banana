@@ -58,6 +58,7 @@ const LLM_PROVIDERS: { value: LLMProvider; label: string }[] = [
   { value: "google", label: "Google" },
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
+  { value: "kie", label: "Kie.ai" },
 ];
 
 const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> = {
@@ -75,6 +76,11 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
     { value: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
     { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
+  ],
+  kie: [
+    { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
+    { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "kie-gpt-5.4", label: "GPT 5.4" },
   ],
 };
 
