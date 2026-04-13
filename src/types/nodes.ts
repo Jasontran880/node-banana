@@ -25,6 +25,7 @@ import type { LLMProvider, LLMModelType, SelectedModel, ProviderType } from "./p
 export type NodeType =
   | "imageInput"
   | "audioInput"
+  | "videoInput"
   | "annotation"
   | "prompt"
   | "array"
@@ -45,6 +46,8 @@ export type NodeType =
   | "switch"
   | "conditionalSwitch"
   | "generate3d"
+  | "imageUpscaler"
+  | "videoUpscaler"
   | "glbViewer";
 
 /**
@@ -72,6 +75,16 @@ export interface AudioInputNodeData extends BaseNodeData {
   duration: number | null;       // Duration in seconds
   format: string | null;         // MIME type (audio/mp3, audio/wav, etc.)
   isOptional?: boolean;
+}
+
+/**
+ * Video input node - loads/uploads video files into the workflow
+ */
+export interface VideoInputNodeData extends BaseNodeData {
+  videoFile: string | null;      // Base64 data URL of the video file
+  filename: string | null;       // Original filename for display
+  duration: number | null;       // Duration in seconds
+  format: string | null;         // MIME type (video/mp4, video/webm, etc.)
 }
 
 /**
@@ -140,6 +153,9 @@ export interface CarouselImageItem {
   prompt: string;
   aspectRatio: AspectRatio;
   model: ModelType;
+  /** Inline image data (base64 data URL). Present when generationsPath is unset
+   *  or as a fast-path cache so carousel navigation never requires a disk fetch. */
+  data?: string;
 }
 
 /**
@@ -202,6 +218,9 @@ export interface GenerateVideoNodeData extends BaseNodeData {
   inputSchema?: ModelInputDef[]; // Model's input schema for dynamic handles
   parametersExpanded?: boolean; // Collapse state for inline parameter display
   _settingsPanelHeight?: number; // Measured settings panel height for reload correction
+  veoVideoUri?: string | null; // Google-hosted URI from last Veo generation; valid 2 days, required for extend
+  kieVeoTaskId?: string | null; // Kie.ai task ID from last Veo 3.1 generation, used for extend
+  extendPrompt?: string | null; // Inline prompt typed directly on the node, used for extend action
   status: NodeStatus;
   error: string | null;
   videoHistory: CarouselVideoItem[]; // Carousel history (IDs only)
@@ -438,6 +457,29 @@ export interface SplitGridNodeData extends BaseNodeData {
 }
 
 /**
+ * Image Upscaler node - AI image upscaling via Kie.ai (Topaz)
+ */
+export interface ImageUpscalerNodeData extends BaseNodeData {
+  inputImage: string | null;
+  outputImage: string | null;
+  upscaleFactor: "1" | "2" | "4" | "8";
+  status: NodeStatus;
+  error: string | null;
+}
+
+/**
+ * Video Upscaler node - AI video upscaling via Kie.ai or MuAPI (Topaz)
+ */
+export interface VideoUpscalerNodeData extends BaseNodeData {
+  inputVideo: string | null;
+  outputVideo: string | null;
+  upscaleFactor: "1" | "2" | "4";
+  selectedProvider: "kie" | "muapi";
+  status: NodeStatus;
+  error: string | null;
+}
+
+/**
  * GLB 3D Viewer node - loads and displays 3D models, captures viewport as image
  */
 export interface GLBViewerNodeData extends BaseNodeData {
@@ -452,6 +494,7 @@ export interface GLBViewerNodeData extends BaseNodeData {
 export type WorkflowNodeData =
   | ImageInputNodeData
   | AudioInputNodeData
+  | VideoInputNodeData
   | AnnotationNodeData
   | PromptNodeData
   | ArrayNodeData
@@ -472,6 +515,8 @@ export type WorkflowNodeData =
   | RouterNodeData
   | SwitchNodeData
   | ConditionalSwitchNodeData
+  | ImageUpscalerNodeData
+  | VideoUpscalerNodeData
   | GLBViewerNodeData;
 
 /**

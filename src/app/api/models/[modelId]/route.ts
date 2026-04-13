@@ -579,6 +579,53 @@ function extractParametersFromSchema(
 }
 
 /**
+ * Get hardcoded schema for mu-api models
+ */
+function getMuapiSchema(modelId: string): ExtractedSchema {
+  const schemas: Record<string, ExtractedSchema> = {
+    "seedance-v2.0-i2v": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio (reference image aspect ratio takes precedence)", enum: ["16:9", "9:16", "4:3", "3:4"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds", enum: [5, 10, 15], default: 5 },
+        { name: "quality", type: "string", description: "Output quality. basic=$0.08/sec, high=$0.15/sec", enum: ["basic", "high"], default: "basic" },
+        { name: "remove_watermark", type: "boolean", description: "Remove watermark from generated video", default: false },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "images_list", type: "image", required: true, label: "Image", isArray: true },
+      ],
+    },
+  };
+
+  return schemas[modelId] || { parameters: [], inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }] };
+}
+
+/**
+ * Get hardcoded schema for Higgsfield models
+ * Higgsfield doesn't have a schema discovery API, so we define these manually
+ */
+function getHiggsfieldSchema(modelId: string): ExtractedSchema {
+  const schemas: Record<string, ExtractedSchema> = {
+    "soul-standard": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["9:16", "16:9", "4:3", "3:4", "1:1", "2:3", "3:2"], default: "4:3" },
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["720p", "1080p"], default: "720p" },
+        { name: "batch_size", type: "integer", description: "Number of images to generate (1 or 4)", enum: [1, 4], default: 1 },
+        { name: "enhance_prompt", type: "boolean", description: "Auto-enhance the prompt before generation", default: true },
+        { name: "seed", type: "integer", description: "Reproducibility seed (1–1000000). Leave empty for random.", minimum: 1, maximum: 1000000 },
+        { name: "style_id", type: "string", description: "Soul Style UUID to apply (get IDs from Higgsfield /v1/text2image/soul-styles)" },
+        { name: "style_strength", type: "number", description: "Strength of the applied style (0–1)", default: 1, minimum: 0, maximum: 1 },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+      ],
+    },
+  };
+
+  return schemas[modelId] || { parameters: [], inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }] };
+}
+
+/**
  * Get hardcoded schema for Kie.ai models
  * Kie.ai doesn't have a schema discovery API, so we define these manually
  */
@@ -844,6 +891,45 @@ function getKieSchema(modelId: string): ExtractedSchema {
         { name: "video_urls", type: "image", required: true, label: "Video", isArray: true },
       ],
     },
+    "sora-2-pro-text-to-video": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["landscape", "portrait"], default: "landscape" },
+        { name: "n_frames", type: "string", description: "Number of frames (affects duration)", enum: ["10", "15"], default: "10" },
+        { name: "size", type: "string", description: "Output quality", enum: ["standard", "high"], default: "high" },
+        { name: "remove_watermark", type: "boolean", description: "Remove watermark from output", default: false },
+      ],
+      inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }],
+    },
+    "sora-2-pro-image-to-video": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["landscape", "portrait"], default: "landscape" },
+        { name: "n_frames", type: "string", description: "Number of frames (affects duration)", enum: ["10", "15"], default: "10" },
+        { name: "size", type: "string", description: "Output quality", enum: ["standard", "high"], default: "standard" },
+        { name: "remove_watermark", type: "boolean", description: "Remove watermark from output", default: false },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "image_urls", type: "image", required: true, label: "Image", isArray: true },
+      ],
+    },
+    "sora-2-pro-storyboard": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["landscape", "portrait"], default: "landscape" },
+        { name: "n_frames", type: "string", description: "Number of frames (affects duration)", enum: ["10", "15", "25"], default: "15" },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: false, label: "Prompt" },
+        { name: "image_urls", type: "image", required: false, label: "Image", isArray: true },
+      ],
+    },
+    "topaz/image-upscale": {
+      parameters: [
+        { name: "upscale_factor", type: "string", description: "Upscale factor", enum: ["1", "2", "4", "8"], default: "2" },
+      ],
+      inputs: [
+        { name: "image_url", type: "image", required: true, label: "Image" },
+      ],
+    },
     "topaz/video-upscale": {
       parameters: [
         { name: "upscale_factor", type: "string", description: "Upscale factor", enum: ["1", "2", "4"], default: "2" },
@@ -866,7 +952,8 @@ function getKieSchema(modelId: string): ExtractedSchema {
       ],
       inputs: [
         { name: "prompt", type: "text", required: true, label: "Prompt" },
-        { name: "imageUrls", type: "image", required: true, label: "Image", isArray: true },
+        { name: "first_frame", type: "image", required: true, label: "First Frame" },
+        { name: "last_frame", type: "image", required: false, label: "Last Frame" },
       ],
     },
     "veo3-fast/text-to-video": {
@@ -883,7 +970,50 @@ function getKieSchema(modelId: string): ExtractedSchema {
       ],
       inputs: [
         { name: "prompt", type: "text", required: true, label: "Prompt" },
-        { name: "imageUrls", type: "image", required: true, label: "Image", isArray: true },
+        { name: "first_frame", type: "image", required: true, label: "First Frame" },
+        { name: "last_frame", type: "image", required: false, label: "Last Frame" },
+      ],
+    },
+    "seedance-2/text-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }],
+    },
+    "seedance-2/image-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "first_frame_url", type: "image", required: false, label: "First Frame" },
+      ],
+    },
+    "seedance-2-fast/text-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }],
+    },
+    "seedance-2-fast/image-to-video": {
+      parameters: [
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["480p", "720p"], default: "720p" },
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"], default: "16:9" },
+        { name: "duration", type: "integer", description: "Video duration in seconds (4-15)", default: 8 },
+        { name: "generate_audio", type: "boolean", description: "Enable audio synthesis", default: true },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "first_frame_url", type: "image", required: false, label: "First Frame" },
       ],
     },
   };
@@ -1170,11 +1300,11 @@ export async function GET(
   const decodedModelId = decodeURIComponent(modelId);
   const provider = request.nextUrl.searchParams.get("provider") as ProviderType | null;
 
-  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini")) {
+  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini" && provider !== "muapi" && provider !== "higgsfield")) {
     return NextResponse.json<SchemaErrorResponse>(
       {
         success: false,
-        error: "Invalid or missing provider. Use ?provider=replicate, ?provider=fal, ?provider=kie, ?provider=wavespeed, or ?provider=gemini",
+        error: "Invalid or missing provider. Use ?provider=replicate, ?provider=fal, ?provider=kie, ?provider=wavespeed, ?provider=gemini, or ?provider=higgsfield",
       },
       { status: 400 }
     );
@@ -1217,6 +1347,12 @@ export async function GET(
         );
       }
       result = await fetchReplicateSchema(decodedModelId, apiKey);
+    } else if (provider === "muapi") {
+      // mu-api uses hardcoded schemas (no schema discovery API)
+      result = getMuapiSchema(decodedModelId);
+    } else if (provider === "higgsfield") {
+      // Higgsfield uses hardcoded schemas (no schema discovery API)
+      result = getHiggsfieldSchema(decodedModelId);
     } else if (provider === "kie") {
       // Kie.ai uses hardcoded schemas (no schema discovery API)
       result = getKieSchema(decodedModelId);

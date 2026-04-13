@@ -47,7 +47,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   const nodeData = data;
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { geminiApiKey, replicateApiKey, falApiKey, kieApiKey, replicateEnabled, kieEnabled } = useProviderApiKeys();
+  const { geminiApiKey, replicateApiKey, falApiKey, kieApiKey, muapiApiKey, replicateEnabled, kieEnabled, muapiEnabled } = useProviderApiKeys();
   const generationsPath = useWorkflowStore((state) => state.generationsPath);
   const [externalModels, setExternalModels] = useState<ProviderModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -65,6 +65,16 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     browseRegistry.register(id, () => setIsBrowseDialogOpen(true));
     return () => { browseRegistry.unregister(id); };
   }, [id]);
+
+  // Detect missing prompt: no text edge connected AND no inputPrompt stored
+  const missingPrompt = useWorkflowStore(
+    useCallback((state) => {
+      const hasTextEdge = state.edges.some(
+        (e) => e.target === id && typeof e.targetHandle === "string" && e.targetHandle.startsWith("text")
+      );
+      return !hasTextEdge && !nodeData.inputPrompt;
+    }, [id, nodeData.inputPrompt])
+  );
 
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "fal";
 
@@ -85,8 +95,12 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     if (kieEnabled && kieApiKey) {
       providers.push({ id: "kie", name: "Kie.ai" });
     }
+    // Add mu-api if configured
+    if (muapiEnabled && muapiApiKey) {
+      providers.push({ id: "muapi", name: "mu-api" });
+    }
     return providers;
-  }, [geminiApiKey, replicateEnabled, replicateApiKey, kieEnabled, kieApiKey]);
+  }, [geminiApiKey, replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, muapiEnabled, muapiApiKey]);
 
   // Fetch models from external providers when provider changes
   const fetchModels = useCallback(async () => {
@@ -106,6 +120,9 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       }
       if (kieApiKey) {
         headers["X-Kie-Key"] = kieApiKey;
+      }
+      if (muapiApiKey) {
+        headers["X-Muapi-Key"] = muapiApiKey;
       }
       const response = await deduplicatedFetch(`/api/models?provider=${currentProvider}&capabilities=${capabilities}`, { headers });
       if (response.ok) {
@@ -129,7 +146,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
     } finally {
       setIsLoadingModels(false);
     }
-  }, [currentProvider, geminiApiKey, replicateApiKey, falApiKey, kieApiKey]);
+  }, [currentProvider, geminiApiKey, replicateApiKey, falApiKey, kieApiKey, muapiApiKey]);
 
   useEffect(() => {
     fetchModels();
@@ -182,7 +199,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   );
 
   const handleClearVideo = useCallback(() => {
-    updateNodeData(id, { outputVideo: null, status: "idle", error: null });
+    updateNodeData(id, { outputVideo: null, status: "idle", error: null, veoVideoUri: null, kieVeoTaskId: null });
   }, [id, updateNodeData]);
 
   const handleParametersChange = useCallback(
@@ -221,11 +238,34 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
   );
 
   const regenerateNode = useWorkflowStore((state) => state.regenerateNode);
+  const extendVideo = useWorkflowStore((state) => state.extendVideo);
   const isRunning = useWorkflowStore((state) => state.isRunning);
 
   const handleRegenerate = useCallback(() => {
     regenerateNode(id);
   }, [id, regenerateNode]);
+
+  const handleExtend = useCallback(() => {
+    extendVideo(id);
+  }, [id, extendVideo]);
+
+  // Extend prompt text change handler
+  const handleExtendPromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateNodeData(id, { extendPrompt: e.target.value });
+  }, [id, updateNodeData]);
+
+  const isKieVeoSelected = (modelId: string | undefined): boolean => {
+    if (!modelId) return false;
+    return modelId.startsWith("veo3/") || modelId.startsWith("veo3-fast/");
+  };
+
+  // Show extend UI for Veo nodes that have a stored video URI (Gemini) or task ID (Kie)
+  const showExtendPanel =
+    (isVeoModel(nodeData.selectedModel?.modelId) && !!nodeData.veoVideoUri) ||
+    (isKieVeoSelected(nodeData.selectedModel?.modelId) && !!nodeData.kieVeoTaskId);
+
+  // Extend button active when there's a non-empty prompt
+  const canExtend = showExtendPanel && !!(nodeData.extendPrompt?.trim());
 
   // Load video by ID from generations folder
   const loadVideoById = useCallback(async (videoId: string) => {
@@ -386,6 +426,7 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       selected={selected}
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
+      missingInput={missingPrompt}
       fullBleed
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputVideo}
@@ -620,6 +661,30 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       >
         Video
       </div>
+
+      {/* Extend prompt panel — shown for Veo nodes after a video has been generated */}
+      {showExtendPanel && (
+        <div className="px-2 pb-1.5 pt-1 flex flex-col gap-1 border-t border-neutral-700/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-neutral-400 font-medium">Extend prompt</span>
+            <button
+              onClick={handleExtend}
+              disabled={!canExtend || isRunning || nodeData.status === "loading"}
+              className="h-5 px-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed rounded text-white text-[10px] font-medium transition-colors"
+              title={canExtend ? "Extend video by ~8 seconds" : "Enter a prompt to extend"}
+            >
+              +8s
+            </button>
+          </div>
+          <textarea
+            value={nodeData.extendPrompt ?? ""}
+            onChange={handleExtendPromptChange}
+            placeholder="Describe how to continue the video…"
+            rows={2}
+            className="w-full text-[11px] bg-neutral-800 text-neutral-100 placeholder-neutral-500 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-violet-500 nodrag"
+          />
+        </div>
+      )}
 
       <div className="relative w-full h-full min-h-0 overflow-hidden rounded-lg">
         {/* Preview area */}

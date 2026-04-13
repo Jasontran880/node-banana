@@ -118,10 +118,45 @@ export function getKieModelDefaults(modelId: string): Record<string, unknown> {
         resolution: "1080p",
       };
 
-    // Topaz video upscale
+    // Sora 2 Pro models
+    case "sora-2-pro-text-to-video":
+      return {
+        aspect_ratio: "landscape",
+        n_frames: "10",
+        size: "high",
+        upload_method: "s3",
+      };
+    case "sora-2-pro-image-to-video":
+      return {
+        aspect_ratio: "landscape",
+        n_frames: "10",
+        size: "standard",
+        upload_method: "s3",
+      };
+    case "sora-2-pro-storyboard":
+      return {
+        aspect_ratio: "landscape",
+        n_frames: "15",
+        upload_method: "s3",
+      };
+
+    // Topaz image/video upscale
+    case "topaz/image-upscale":
     case "topaz/video-upscale":
       return {
         upscale_factor: "2",
+      };
+
+    // Seedance 2.0 models
+    case "seedance-2/text-to-video":
+    case "seedance-2/image-to-video":
+    case "seedance-2-fast/text-to-video":
+    case "seedance-2-fast/image-to-video":
+      return {
+        resolution: "720p",
+        aspect_ratio: "16:9",
+        duration: 8,
+        generate_audio: true,
       };
 
     // Veo 3 models
@@ -167,6 +202,10 @@ export function getKieImageInputKey(modelId: string): string {
   if (modelId === "kling/v2-5-turbo-image-to-video-pro") return "image_url";
   // Kling 2.6 motion control uses input_urls
   if (modelId === "kling-2.6/motion-control") return "input_urls";
+  // Seedance 2.0 I2V uses first_frame_url (singular)
+  if (modelId === "seedance-2/image-to-video" || modelId === "seedance-2-fast/image-to-video") return "first_frame_url";
+  // Topaz image upscale uses image_url (singular)
+  if (modelId === "topaz/image-upscale") return "image_url";
   // Topaz video upscale uses video_url (singular)
   if (modelId === "topaz/video-upscale") return "video_url";
   // Veo 3 models use imageUrls
@@ -196,6 +235,67 @@ export function detectImageType(buffer: Buffer): { mimeType: string; ext: string
   }
   // Default to PNG
   return { mimeType: "image/png", ext: "png" };
+}
+
+/**
+ * Upload a base64 video to Kie.ai and get a URL.
+ * Used for video-to-video models (e.g. Topaz video upscale).
+ */
+export async function uploadVideoToKie(
+  requestId: string,
+  apiKey: string,
+  base64Video: string
+): Promise<string> {
+  let mimeType = "video/mp4";
+  let videoData = base64Video;
+
+  if (base64Video.startsWith("data:")) {
+    const matches = base64Video.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      mimeType = matches[1];
+      videoData = matches[2];
+    }
+  }
+
+  const binaryData = Buffer.from(videoData, "base64");
+  const ext = mimeType.includes("webm") ? "webm" : mimeType.includes("mov") ? "mov" : "mp4";
+  const filename = `upload_${Date.now()}.${ext}`;
+  const dataUrl = `data:${mimeType};base64,${videoData}`;
+
+  console.log(`[API:${requestId}] Uploading video to Kie.ai: ${filename} (${(binaryData.length / (1024 * 1024)).toFixed(1)}MB)`);
+
+  const response = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      base64Data: dataUrl,
+      uploadPath: "videos",
+      fileName: filename,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to upload video: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[API:${requestId}] Kie video upload response:`, JSON.stringify(result).substring(0, 300));
+
+  if (result.code && result.code !== 200 && !result.success) {
+    throw new Error(`Video upload failed: ${result.msg || 'Unknown error'}`);
+  }
+
+  const downloadUrl = result.data?.downloadUrl || result.data?.url || result.downloadUrl || result.url;
+  if (!downloadUrl) {
+    throw new Error(`No download URL in video upload response. Response: ${JSON.stringify(result).substring(0, 200)}`);
+  }
+
+  console.log(`[API:${requestId}] Video uploaded: ${downloadUrl.substring(0, 80)}...`);
+  return downloadUrl;
 }
 
 /**
@@ -334,6 +434,15 @@ export async function pollKieTaskCompletion(
 }
 
 
+export function isSeedance2Model(modelId: string): boolean {
+  return modelId.startsWith("seedance-2/") || modelId.startsWith("seedance-2-fast/");
+}
+
+export function getSeedance2ApiModelId(modelId: string): string {
+  if (modelId.startsWith("seedance-2-fast/")) return "bytedance/seedance-2-fast";
+  return "bytedance/seedance-2";
+}
+
 export function isVeoModel(modelId: string): boolean {
   return modelId.startsWith("veo3/") || modelId.startsWith("veo3-fast/");
 }
@@ -388,6 +497,131 @@ export async function pollVeoTaskCompletion(
 }
 
 /**
+ * Extend an existing Veo 3.1 video using Kie.ai's extend endpoint.
+ * Requires the taskId returned from a prior Veo generation.
+ */
+export async function extendVeoKieVideo(
+  requestId: string,
+  apiKey: string,
+  taskId: string,
+  prompt: string,
+  modelVariant: string = "veo3_fast",
+): Promise<GenerationOutput> {
+  // Map internal model IDs to extend API model param (fast/quality/lite)
+  let extendModel = "fast";
+  if (modelVariant === "veo3") extendModel = "quality";
+  else if (modelVariant === "veo3_lite") extendModel = "lite";
+
+  const extendBody: Record<string, unknown> = {
+    taskId,
+    prompt,
+    model: extendModel,
+  };
+
+  const extendUrl = "https://api.kie.ai/api/v1/veo/extend";
+  console.log(`[API:${requestId}] Calling Veo extend API: ${extendUrl}`);
+  console.log(`[API:${requestId}] Veo extend body:`, JSON.stringify(extendBody, null, 2));
+
+  const createResponse = await fetch(extendUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(extendBody),
+  });
+
+  if (!createResponse.ok) {
+    const errorText = await createResponse.text();
+    let errorDetail = errorText;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorDetail = errorJson.message || errorJson.error || errorJson.detail || errorText;
+    } catch {
+      // Keep original text
+    }
+    if (createResponse.status === 429) {
+      return { success: false, error: "Veo extend: Rate limit exceeded. Try again in a moment." };
+    }
+    return { success: false, error: `Veo extend: ${errorDetail}` };
+  }
+
+  const createResult = await createResponse.json();
+  if (createResult.code && createResult.code !== 200) {
+    return { success: false, error: `Veo extend: ${createResult.msg || "API error"}` };
+  }
+
+  const extendTaskId = createResult.data?.taskId || createResult.taskId;
+  if (!extendTaskId) {
+    console.error(`[API:${requestId}] No taskId in Veo extend response:`, createResult);
+    return { success: false, error: "No task ID in Veo extend response" };
+  }
+
+  console.log(`[API:${requestId}] Veo extend task created: ${extendTaskId}`);
+
+  const pollResult = await pollVeoTaskCompletion(requestId, apiKey, extendTaskId);
+  if (!pollResult.success) {
+    return { success: false, error: `Veo extend: ${pollResult.error}` };
+  }
+
+  const data = pollResult.data;
+  let mediaUrl: string | null = null;
+
+  const responseObj = data?.response as Record<string, unknown> | undefined;
+  const resultUrls = (responseObj?.resultUrls || data?.resultUrls) as string[] | undefined;
+  if (resultUrls && resultUrls.length > 0) {
+    mediaUrl = resultUrls[0];
+  }
+
+  if (!mediaUrl) {
+    console.error(`[API:${requestId}] No media URL in Veo extend response:`, data);
+    return { success: false, error: "No output URL in Veo extend response" };
+  }
+
+  const mediaUrlCheck = validateMediaUrl(mediaUrl);
+  if (!mediaUrlCheck.valid) {
+    return { success: false, error: `Invalid media URL: ${mediaUrlCheck.error}` };
+  }
+
+  console.log(`[API:${requestId}] Fetching Veo extend output from: ${mediaUrl.substring(0, 80)}...`);
+  const mediaResponse = await fetch(mediaUrl);
+  if (!mediaResponse.ok) {
+    return { success: false, error: `Failed to fetch extended video: ${mediaResponse.status}` };
+  }
+
+  const mediaContentLength = parseInt(mediaResponse.headers.get("content-length") || "0", 10);
+  if (mediaContentLength > MAX_MEDIA_SIZE) {
+    return { success: false, error: `Media too large: ${(mediaContentLength / (1024 * 1024)).toFixed(0)}MB > 500MB limit` };
+  }
+
+  const contentType = mediaResponse.headers.get("content-type") || "video/mp4";
+  const mediaArrayBuffer = await mediaResponse.arrayBuffer();
+  if (mediaArrayBuffer.byteLength > MAX_MEDIA_SIZE) {
+    return { success: false, error: `Media too large: ${(mediaArrayBuffer.byteLength / (1024 * 1024)).toFixed(0)}MB > 500MB limit` };
+  }
+  const mediaSizeMB = mediaArrayBuffer.byteLength / (1024 * 1024);
+
+  console.log(`[API:${requestId}] Veo extend output: ${contentType}, ${mediaSizeMB.toFixed(2)}MB`);
+
+  if (mediaSizeMB > 20) {
+    console.log(`[API:${requestId}] SUCCESS - Returning URL for large Veo extend video`);
+    return {
+      success: true,
+      outputs: [{ type: "video", data: "", url: mediaUrl }],
+      metadata: { kieVeoTaskId: extendTaskId },
+    };
+  }
+
+  const mediaBase64 = Buffer.from(mediaArrayBuffer).toString("base64");
+  console.log(`[API:${requestId}] SUCCESS - Returning Veo extend video`);
+  return {
+    success: true,
+    outputs: [{ type: "video", data: `data:${contentType};base64,${mediaBase64}`, url: mediaUrl }],
+    metadata: { kieVeoTaskId: extendTaskId },
+  };
+}
+
+/**
  * Generate image/video using Kie.ai API
  */
 export async function generateWithKie(
@@ -428,11 +662,16 @@ export async function generateWithKie(
     for (const [key, value] of Object.entries(input.dynamicInputs)) {
       if (value !== null && value !== undefined && value !== '') {
         // Check if this is an image input that needs uploading
-        if (typeof value === 'string' && value.startsWith('data:image')) {
+        if (typeof value === 'string' && value.startsWith('data:video')) {
+          // Video data URL - upload to Kie
+          const url = await uploadVideoToKie(requestId, apiKey, value);
+          inputParams[key] = url;
+          handledImageKeys.add(key);
+        } else if (typeof value === 'string' && value.startsWith('data:image')) {
           // Single data URL - upload it
           const url = await uploadImageToKie(requestId, apiKey, value);
           // Singular keys get a string, plural keys get an array
-          if (key === "image_url" || key === "video_url" || key === "tail_image_url") {
+          if (key === "image_url" || key === "video_url" || key === "tail_image_url" || key === "first_frame_url" || key === "last_frame_url") {
             inputParams[key] = url;
           } else {
             inputParams[key] = [url];
@@ -453,7 +692,7 @@ export async function generateWithKie(
           }
           if (processedArray.length > 0) {
             // Singular keys get first element, plural keys get full array
-            if (key === "image_url" || key === "video_url" || key === "tail_image_url") {
+            if (key === "image_url" || key === "video_url" || key === "tail_image_url" || key === "first_frame_url" || key === "last_frame_url") {
               inputParams[key] = processedArray[0];
             } else {
               inputParams[key] = processedArray;
@@ -465,6 +704,18 @@ export async function generateWithKie(
         }
       }
     }
+  }
+
+  // Handle video inputs (for video-to-video models like Topaz video upscale)
+  if (input.videos && input.videos.length > 0 && !handledImageKeys.has("video_url")) {
+    const videoData = input.videos[0];
+    if (videoData.startsWith("http")) {
+      inputParams["video_url"] = videoData;
+    } else {
+      const url = await uploadVideoToKie(requestId, apiKey, videoData);
+      inputParams["video_url"] = url;
+    }
+    handledImageKeys.add("video_url");
   }
 
   // Handle image inputs (fallback - only if dynamicInputs didn't already set the image key)
@@ -483,7 +734,7 @@ export async function generateWithKie(
     }
 
     // Some models use singular string, others use arrays
-    if (imageKey === "image_url" || imageKey === "video_url") {
+    if (imageKey === "image_url" || imageKey === "video_url" || imageKey === "first_frame_url" || imageKey === "last_frame_url") {
       inputParams[imageKey] = imageUrls[0];
     } else {
       inputParams[imageKey] = imageUrls;
@@ -498,8 +749,23 @@ export async function generateWithKie(
       aspect_ratio: inputParams.aspect_ratio || "16:9",
     };
 
-    // Add image URLs if present (for image-to-video)
-    if (inputParams.imageUrls) {
+    // Build imageUrls from first_frame / last_frame dynamic inputs (I2V)
+    const frameUrls: string[] = [];
+    for (const key of ["first_frame", "last_frame"] as const) {
+      const val = inputParams[key];
+      if (val) {
+        const url = Array.isArray(val) ? val[0] : val;
+        if (url) frameUrls.push(url as string);
+      }
+    }
+
+    if (frameUrls.length > 0) {
+      veoBody.imageUrls = frameUrls;
+      veoBody.generationType = frameUrls.length === 2
+        ? "FIRST_AND_LAST_FRAMES_2_VIDEO"
+        : "REFERENCE_2_VIDEO";
+    } else if (inputParams.imageUrls) {
+      // Fallback: legacy imageUrls if still present
       veoBody.imageUrls = Array.isArray(inputParams.imageUrls)
         ? inputParams.imageUrls
         : [inputParams.imageUrls];
@@ -605,6 +871,7 @@ export async function generateWithKie(
       return {
         success: true,
         outputs: [{ type: "video", data: "", url: mediaUrl }],
+        metadata: { kieVeoTaskId: taskId },
       };
     }
 
@@ -613,6 +880,7 @@ export async function generateWithKie(
     return {
       success: true,
       outputs: [{ type: "video", data: `data:${contentType};base64,${mediaBase64}`, url: mediaUrl }],
+      metadata: { kieVeoTaskId: taskId },
     };
   }
 
@@ -624,9 +892,15 @@ export async function generateWithKie(
     }
   }
 
+  // Remap project model IDs to actual Kie API model IDs where they differ
+  let apiModelId = modelId;
+  if (isSeedance2Model(modelId)) {
+    apiModelId = getSeedance2ApiModelId(modelId);
+  }
+
   // All remaining Kie models use the standard createTask endpoint
   const requestBody: Record<string, unknown> = {
-    model: modelId,
+    model: apiModelId,
     input: inputParams,
   };
 

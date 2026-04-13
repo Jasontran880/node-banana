@@ -3,6 +3,7 @@ import {
   ModelType,
   ImageInputNodeData,
   AudioInputNodeData,
+  VideoInputNodeData,
   AnnotationNodeData,
   PromptNodeData,
   ArrayNodeData,
@@ -22,6 +23,8 @@ import {
   RouterNodeData,
   SwitchNodeData,
   ConditionalSwitchNodeData,
+  ImageUpscalerNodeData,
+  VideoUpscalerNodeData,
   GLBViewerNodeData,
   WorkflowNodeData,
   GroupColor,
@@ -37,6 +40,7 @@ import { loadGenerateImageDefaults, loadNodeDefaults } from "./localStorage";
 export const defaultNodeDimensions: Record<NodeType, { width: number; height: number }> = {
   imageInput: { width: 300, height: 280 },
   audioInput: { width: 300, height: 200 },
+  videoInput: { width: 300, height: 220 },
   annotation: { width: 300, height: 280 },
   prompt: { width: 320, height: 220 },
   array: { width: 340, height: 260 },
@@ -44,6 +48,8 @@ export const defaultNodeDimensions: Record<NodeType, { width: number; height: nu
   nanoBanana: { width: 300, height: 300 },
   generateVideo: { width: 300, height: 300 },
   generate3d: { width: 300, height: 300 },
+  imageUpscaler: { width: 300, height: 300 },
+  videoUpscaler: { width: 300, height: 300 },
   generateAudio: { width: 300, height: 280 },
   llmGenerate: { width: 320, height: 360 },
   splitGrid: { width: 300, height: 320 },
@@ -97,6 +103,13 @@ export const createDefaultNodeData = (type: NodeType): WorkflowNodeData => {
         duration: null,
         format: null,
       } as AudioInputNodeData;
+    case "videoInput":
+      return {
+        videoFile: null,
+        filename: null,
+        duration: null,
+        format: null,
+      } as VideoInputNodeData;
     case "annotation":
       return {
         sourceImage: null,
@@ -316,6 +329,23 @@ export const createDefaultNodeData = (type: NodeType): WorkflowNodeData => {
           }
         ]
       } as ConditionalSwitchNodeData;
+    case "imageUpscaler":
+      return {
+        inputImage: null,
+        outputImage: null,
+        upscaleFactor: "2",
+        status: "idle",
+        error: null,
+      } as ImageUpscalerNodeData;
+    case "videoUpscaler":
+      return {
+        inputVideo: null,
+        outputVideo: null,
+        upscaleFactor: "2",
+        selectedProvider: "kie",
+        status: "idle",
+        error: null,
+      } as VideoUpscalerNodeData;
     case "glbViewer":
       return {
         glbUrl: null,

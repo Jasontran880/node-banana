@@ -12,6 +12,8 @@ import type { NodeExecutionContext } from "./types";
 export interface GenerateVideoOptions {
   /** When true, falls back to stored inputImages/inputPrompt if no connections provide them. */
   useStoredFallback?: boolean;
+  /** When "extend", sends an extend request using the node's stored veoVideoUri instead of generating fresh. */
+  action?: "extend";
 }
 
 export async function executeGenerateVideo(
@@ -31,7 +33,7 @@ export async function executeGenerateVideo(
     trackSaveGeneration,
   } = ctx;
 
-  const { useStoredFallback = false } = options;
+  const { useStoredFallback = false, action } = options;
 
   const { images: connectedImages, text: connectedText, dynamicInputs } = getConnectedInputs(node.id);
 
@@ -45,15 +47,23 @@ export async function executeGenerateVideo(
 
   if (useStoredFallback) {
     images = connectedImages.length > 0 ? connectedImages : nodeData.inputImages;
-    text = connectedText ?? nodeData.inputPrompt;
-    // Validate fallback inputs the same way as the regular path
-    const hasPrompt = text || dynamicInputs.prompt || dynamicInputs.negative_prompt;
-    if (!hasPrompt && images.length === 0) {
-      updateNodeData(node.id, {
-        status: "error",
-        error: "Missing required inputs",
-      });
-      throw new Error("Missing required inputs");
+    // For extend, prefer the inline extendPrompt field, then fall back to connected/stored prompt
+    text = action === "extend"
+      ? (nodeData.extendPrompt || connectedText || nodeData.inputPrompt)
+      : (connectedText ?? nodeData.inputPrompt);
+    // For extend, only a prompt is required (no images needed)
+    if (action === "extend") {
+      const hasPrompt = text || dynamicInputs.prompt;
+      if (!hasPrompt) {
+        updateNodeData(node.id, { status: "error", error: "A prompt is required to extend a video" });
+        throw new Error("A prompt is required to extend a video");
+      }
+    } else {
+      const hasPrompt = text || dynamicInputs.prompt || dynamicInputs.negative_prompt;
+      if (!hasPrompt && images.length === 0) {
+        updateNodeData(node.id, { status: "error", error: "Missing required inputs" });
+        throw new Error("Missing required inputs");
+      }
     }
   } else {
     images = connectedImages;
@@ -87,13 +97,21 @@ export async function executeGenerateVideo(
   const provider = nodeData.selectedModel.provider;
   const headers = buildGenerateHeaders(provider, providerSettings);
 
-  const requestPayload = {
+  const isKieVeo = nodeData.selectedModel?.provider === "kie" &&
+    (nodeData.selectedModel.modelId.startsWith("veo3/") || nodeData.selectedModel.modelId.startsWith("veo3-fast/"));
+
+  const requestPayload: Record<string, unknown> = {
     images,
     prompt: text,
     selectedModel: nodeData.selectedModel,
     parameters: nodeData.parameters,
     dynamicInputs,
     mediaType: "video" as const,
+    ...(action === "extend" && isKieVeo
+      ? { action: "extend", kieVeoTaskId: nodeData.kieVeoTaskId }
+      : action === "extend"
+        ? { action: "extend", veoVideoUri: nodeData.veoVideoUri }
+        : {}),
   };
 
   try {
@@ -145,6 +163,10 @@ export async function executeGenerateVideo(
         error: null,
         videoHistory: updatedHistory,
         selectedVideoHistoryIndex: 0,
+        // Store the Veo video URI for Gemini Veo extend feature (refreshed after each generation/extension)
+        ...(result.veoVideoUri ? { veoVideoUri: result.veoVideoUri } : {}),
+        // Store the Kie.ai task ID for Kie Veo 3.1 extend feature
+        ...(result.kieVeoTaskId ? { kieVeoTaskId: result.kieVeoTaskId } : {}),
       });
 
       // Track cost

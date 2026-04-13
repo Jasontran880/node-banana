@@ -268,11 +268,47 @@ const KIE_MODELS: ProviderModel[] = [
     pageUrl: "https://kie.ai/wan-2-6",
   },
   {
+    id: "sora-2-pro-text-to-video",
+    name: "Sora 2 Pro",
+    description: "OpenAI Sora 2 Pro text-to-video generation via Kie.ai.",
+    provider: "kie",
+    capabilities: ["text-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/sora-2-pro",
+  },
+  {
+    id: "sora-2-pro-image-to-video",
+    name: "Sora 2 Pro Image-to-Video",
+    description: "OpenAI Sora 2 Pro video generation from images via Kie.ai.",
+    provider: "kie",
+    capabilities: ["image-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/sora-2-pro",
+  },
+  {
+    id: "sora-2-pro-storyboard",
+    name: "Sora 2 Pro Storyboard",
+    description: "OpenAI Sora 2 Pro storyboard-to-video generation via Kie.ai.",
+    provider: "kie",
+    capabilities: ["text-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/sora-2-pro-storyboard",
+  },
+  {
+    id: "topaz/image-upscale",
+    name: "Topaz Image Upscale",
+    description: "Enhance image resolution and quality using advanced AI upscaling powered by Topaz. Supports 1x, 2x, 4x, and 8x scaling factors.",
+    provider: "kie",
+    capabilities: ["image-to-image"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/topaz",
+  },
+  {
     id: "topaz/video-upscale",
     name: "Topaz Video Upscale",
     description: "AI video upscaling. Supports 1x, 2x, and 4x scaling factors.",
     provider: "kie",
-    capabilities: ["image-to-video"],
+    capabilities: ["video-to-video"],
     coverImage: undefined,
     pageUrl: "https://kie.ai/topaz",
   },
@@ -311,6 +347,42 @@ const KIE_MODELS: ProviderModel[] = [
     capabilities: ["image-to-video"],
     coverImage: undefined,
     pageUrl: "https://docs.kie.ai/veo3-api/quickstart",
+  },
+  {
+    id: "seedance-2/text-to-video",
+    name: "Seedance 2.0",
+    description: "ByteDance Seedance 2.0 text-to-video generation with audio synthesis via Kie.ai.",
+    provider: "kie",
+    capabilities: ["text-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/seedance-2",
+  },
+  {
+    id: "seedance-2/image-to-video",
+    name: "Seedance 2.0 I2V",
+    description: "ByteDance Seedance 2.0 image-to-video generation. Animate a first frame with optional audio via Kie.ai.",
+    provider: "kie",
+    capabilities: ["image-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/seedance-2",
+  },
+  {
+    id: "seedance-2-fast/text-to-video",
+    name: "Seedance 2.0 Fast",
+    description: "ByteDance Seedance 2.0 Fast text-to-video generation via Kie.ai.",
+    provider: "kie",
+    capabilities: ["text-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/seedance-2-fast",
+  },
+  {
+    id: "seedance-2-fast/image-to-video",
+    name: "Seedance 2.0 Fast I2V",
+    description: "ByteDance Seedance 2.0 Fast image-to-video generation via Kie.ai.",
+    provider: "kie",
+    capabilities: ["image-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://kie.ai/seedance-2-fast",
   },
   // ============ Audio/TTS Models (4) ============
   {
@@ -423,6 +495,43 @@ const GEMINI_VIDEO_MODELS: ProviderModel[] = [
     capabilities: ["image-to-video"],
     coverImage: undefined,
     pricing: { type: "per-second", amount: 0.15, currency: "USD" },
+  },
+];
+
+// mu-api models (hardcoded)
+const MUAPI_MODELS: ProviderModel[] = [
+  {
+    id: "seedance-v2.0-i2v",
+    name: "Seedance 2.0 I2V",
+    description: "ByteDance Seedance 2.0 image-to-video. Advanced camera control, native audio-video sync, and high-resolution output. Animates still images into cinematic 5/10/15s video clips.",
+    provider: "muapi",
+    capabilities: ["image-to-video"],
+    coverImage: undefined,
+    pricing: { type: "per-second", amount: 0.08, currency: "USD" },
+    pageUrl: "https://muapi.ai/playground/seedance-v2.0-i2v",
+  },
+  {
+    id: "topaz-video-upscale",
+    name: "Topaz Video Upscale",
+    description: "AI video upscaling using Topaz Labs technology via MuAPI. Enhance resolution 1×, 2×, or 4× with crisp detail preservation.",
+    provider: "muapi",
+    capabilities: ["video-to-video"],
+    coverImage: undefined,
+    pageUrl: "https://muapi.ai/playground/topaz-video-upscale",
+  },
+];
+
+// Higgsfield models (hardcoded)
+const HIGGSFIELD_MODELS: ProviderModel[] = [
+  {
+    id: "soul-standard",
+    name: "Soul Standard",
+    description: "Higgsfield Soul Standard text-to-image. Cinematic, portrait-focused generation with style presets, aspect ratio and resolution control.",
+    provider: "higgsfield",
+    capabilities: ["text-to-image"],
+    coverImage: undefined,
+    pricing: undefined,
+    pageUrl: "https://platform.higgsfield.ai",
   },
 ];
 
@@ -953,6 +1062,8 @@ export async function GET(
   const falKey = request.headers.get("X-Fal-Key") || process.env.FAL_API_KEY || null;
   const kieKey = request.headers.get("X-Kie-Key") || process.env.KIE_API_KEY || null;
   const wavespeedKey = request.headers.get("X-WaveSpeed-Key") || process.env.WAVESPEED_API_KEY || null;
+  const muapiKey = request.headers.get("X-Muapi-Key") || process.env.MUAPI_API_KEY || null;
+  const higgsfieldKey = request.headers.get("X-Higgsfield-Key") || process.env.HIGGSFIELD_API_KEY || null;
 
   // Build list of all available providers (have keys from env or client headers)
   const availableProviders: string[] = ["gemini"]; // Gemini always available
@@ -960,11 +1071,15 @@ export async function GET(
   if (replicateKey) availableProviders.push("replicate");
   if (kieKey) availableProviders.push("kie");
   if (wavespeedKey) availableProviders.push("wavespeed");
+  if (muapiKey) availableProviders.push("muapi");
+  if (higgsfieldKey) availableProviders.push("higgsfield");
 
   // Determine which providers to fetch from (excluding gemini/kie - handled separately as hardcoded)
   const providersToFetch: ProviderType[] = [];
   let includeGemini = false;
   let includeKie = false;
+  let includeMuapi = false;
+  let includeHighsfield = false;
 
   if (providerFilter) {
     if (providerFilter === "gemini") {
@@ -998,6 +1113,30 @@ export async function GET(
           { status: 400 }
         );
       }
+    } else if (providerFilter === "muapi") {
+      if (muapiKey) {
+        includeMuapi = true;
+      } else {
+        return NextResponse.json<ModelsErrorResponse>(
+          {
+            success: false,
+            error: "mu-api API key required. Add MUAPI_API_KEY to .env.local or configure in Settings.",
+          },
+          { status: 400 }
+        );
+      }
+    } else if (providerFilter === "higgsfield") {
+      if (higgsfieldKey) {
+        includeHighsfield = true;
+      } else {
+        return NextResponse.json<ModelsErrorResponse>(
+          {
+            success: false,
+            error: "Higgsfield API key required. Add HIGGSFIELD_API_KEY to .env.local or configure in Settings.",
+          },
+          { status: 400 }
+        );
+      }
     } else if (providerFilter === "replicate" && replicateKey) {
       providersToFetch.push("replicate");
     } else if (providerFilter === "fal" && falKey) {
@@ -1007,6 +1146,8 @@ export async function GET(
     // Include all providers that have keys configured
     includeGemini = true; // Gemini always available
     includeKie = kieKey ? true : false; // Kie only if API key is configured
+    includeMuapi = muapiKey ? true : false; // mu-api only if API key is configured
+    includeHighsfield = higgsfieldKey ? true : false; // Higgsfield only if API key is configured
     if (wavespeedKey) {
       providersToFetch.push("wavespeed"); // WaveSpeed if key is configured
     }
@@ -1019,7 +1160,7 @@ export async function GET(
   }
 
   // Gemini and Kie are always available (with key for Kie), so we don't fail if no external providers
-  if (providersToFetch.length === 0 && !includeGemini && !includeKie) {
+  if (providersToFetch.length === 0 && !includeGemini && !includeKie && !includeMuapi && !includeHighsfield) {
     return NextResponse.json<ModelsErrorResponse>(
       {
         success: false,
@@ -1064,6 +1205,36 @@ export async function GET(
       success: true,
       count: kieModels.length,
       cached: true, // Hardcoded models are effectively "cached"
+    };
+    anyFromCache = true;
+  }
+
+  // Add mu-api models if included (hardcoded, no API call needed)
+  if (includeMuapi) {
+    let muapiModels = MUAPI_MODELS;
+    if (searchQuery) {
+      muapiModels = filterModelsBySearch(muapiModels, searchQuery);
+    }
+    allModels.push(...muapiModels);
+    providerResults["muapi"] = {
+      success: true,
+      count: muapiModels.length,
+      cached: true,
+    };
+    anyFromCache = true;
+  }
+
+  // Add Higgsfield models if included (hardcoded, no API call needed)
+  if (includeHighsfield) {
+    let higgsfieldModels = HIGGSFIELD_MODELS;
+    if (searchQuery) {
+      higgsfieldModels = filterModelsBySearch(higgsfieldModels, searchQuery);
+    }
+    allModels.push(...higgsfieldModels);
+    providerResults["higgsfield"] = {
+      success: true,
+      count: higgsfieldModels.length,
+      cached: true,
     };
     anyFromCache = true;
   }

@@ -51,6 +51,8 @@ export const defaultProviderSettings: ProviderSettings = {
     fal: { id: "fal", name: "fal.ai", enabled: false, apiKey: null, apiKeyEnvVar: "FAL_API_KEY" },
     kie: { id: "kie", name: "Kie.ai", enabled: false, apiKey: null, apiKeyEnvVar: "KIE_API_KEY" },
     wavespeed: { id: "wavespeed", name: "WaveSpeed", enabled: false, apiKey: null, apiKeyEnvVar: "WAVESPEED_API_KEY" },
+    muapi: { id: "muapi", name: "mu-api", enabled: false, apiKey: null, apiKeyEnvVar: "MUAPI_API_KEY" },
+    higgsfield: { id: "higgsfield", name: "Higgsfield", enabled: false, apiKey: null, apiKeyEnvVar: "HIGGSFIELD_API_KEY" },
   }
 };
 

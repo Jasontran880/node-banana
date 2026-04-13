@@ -1,19 +1,17 @@
 "use client";
 
-import { useCallback, useState, useEffect, useMemo, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Handle, Position, NodeProps, Node } from "@xyflow/react";
 import { BaseNode } from "./BaseNode";
 import { useWorkflowStore } from "@/store/workflowStore";
-import { PromptNodeData } from "@/types";
+import { LLMGenerateNodeData, PromptNodeData, PromptConstructorNodeData, ArrayNodeData } from "@/types";
 
 type PromptNodeType = Node<PromptNodeData, "prompt">;
 
 export function PromptNode({ id, data, selected }: NodeProps<PromptNodeType>) {
   const nodeData = data;
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
-  const getConnectedInputs = useWorkflowStore((state) => state.getConnectedInputs);
-  const edges = useWorkflowStore((state) => state.edges);
 
   // Local state for prompt to prevent cursor jumping during typing
   const [localPrompt, setLocalPrompt] = useState(nodeData.prompt);
@@ -24,27 +22,50 @@ export function PromptNode({ id, data, selected }: NodeProps<PromptNodeType>) {
   const [varNameInput, setVarNameInput] = useState(nodeData.variableName || "");
 
   // Check if this node has any incoming text connections
-  const hasIncomingTextConnection = useMemo(() => {
-    return edges.some((edge) => edge.target === id && edge.targetHandle === "text");
-  }, [edges, id]);
+  const hasIncomingTextConnection = useWorkflowStore(
+    useCallback((state) => state.edges.some((e) => e.target === id && e.targetHandle === "text"), [id])
+  );
 
-  // Track the last received text from connected LLM node to detect when it changes
+  // Reactively read the upstream node's current text output.
+  // This selector re-runs whenever nodes or edges change, so the Prompt node
+  // automatically picks up new LLM output without needing to disconnect/reconnect.
+  const connectedText = useWorkflowStore(
+    useCallback((state) => {
+      const incomingEdge = state.edges.find((e) => e.target === id && e.targetHandle === "text");
+      if (!incomingEdge) return null;
+      const sourceNode = state.nodes.find((n) => n.id === incomingEdge.source);
+      if (!sourceNode) return null;
+      const d = sourceNode.data;
+      switch (sourceNode.type) {
+        case "llmGenerate":
+          return (d as LLMGenerateNodeData).outputText ?? null;
+        case "promptConstructor":
+          return (d as PromptConstructorNodeData).outputText ?? null;
+        case "array":
+          return (d as ArrayNodeData).outputText ?? null;
+        case "prompt":
+          return (d as PromptNodeData).prompt ?? null;
+        default:
+          return null;
+      }
+    }, [id])
+  );
+
+  // Track the last text we propagated so we don't loop on our own updates
   const lastReceivedTextRef = useRef<string | null>(null);
 
-  // Get connected text input and update prompt when LLM output changes
+  // Propagate upstream text changes into this node's prompt (and local state)
   useEffect(() => {
-    if (hasIncomingTextConnection) {
-      const { text } = getConnectedInputs(id);
-      // Only update if the incoming text changed (LLM node ran again)
-      if (text !== null && text !== lastReceivedTextRef.current) {
-        lastReceivedTextRef.current = text;
-        updateNodeData(id, { prompt: text });
-      }
-    } else {
-      // Clear tracking when connection is removed
+    if (!hasIncomingTextConnection) {
       lastReceivedTextRef.current = null;
+      return;
     }
-  }, [hasIncomingTextConnection, id, getConnectedInputs, updateNodeData]);
+    if (connectedText !== null && connectedText !== lastReceivedTextRef.current) {
+      lastReceivedTextRef.current = connectedText;
+      updateNodeData(id, { prompt: connectedText });
+      if (!isEditing) setLocalPrompt(connectedText);
+    }
+  }, [connectedText, hasIncomingTextConnection, id, updateNodeData, isEditing]);
 
   // Sync from props when not actively editing
   useEffect(() => {

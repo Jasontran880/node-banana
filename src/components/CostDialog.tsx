@@ -23,6 +23,8 @@ function ProviderIcon({ provider }: { provider: ProviderType }) {
     anthropic: { bg: "bg-amber-500/20", text: "text-amber-300" },
     kie: { bg: "bg-orange-500/20", text: "text-orange-300" },
     wavespeed: { bg: "bg-purple-500/20", text: "text-purple-300" },
+    muapi: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
+    higgsfield: { bg: "bg-rose-500/20", text: "text-rose-300" },
   };
 
   const labels: Record<ProviderType, string> = {
@@ -33,6 +35,8 @@ function ProviderIcon({ provider }: { provider: ProviderType }) {
     anthropic: "A",
     kie: "K",
     wavespeed: "W",
+    muapi: "M",
+    higgsfield: "H",
   };
 
   const color = colors[provider] || colors.gemini;
@@ -56,6 +60,8 @@ function getProviderDisplayName(provider: ProviderType): string {
     anthropic: "Anthropic",
     kie: "Kie.ai",
     wavespeed: "WaveSpeed",
+    muapi: "mu-api",
+    higgsfield: "Higgsfield",
   };
   return names[provider] || provider;
 }

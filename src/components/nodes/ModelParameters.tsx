@@ -80,7 +80,7 @@ function ModelParametersInner({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, higgsfieldApiKey } = useProviderApiKeys();
 
   // Fetch schema when modelId changes
   useEffect(() => {
@@ -116,6 +116,9 @@ function ModelParametersInner({
         if (wavespeedApiKey) {
           headers["X-WaveSpeed-Key"] = wavespeedApiKey;
         }
+        if (higgsfieldApiKey) {
+          headers["X-Higgsfield-Key"] = higgsfieldApiKey;
+        }
 
         const encodedModelId = encodeURIComponent(modelId);
         const response = await deduplicatedFetch(
@@ -150,7 +153,7 @@ function ModelParametersInner({
     };
 
     fetchSchema();
-  }, [modelId, provider, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, onInputsLoaded]);
+  }, [modelId, provider, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, higgsfieldApiKey, onInputsLoaded]);
 
   // Notify parent to resize node when schema loads
   useEffect(() => {
@@ -250,6 +253,7 @@ function ModelParametersInner({
               name={param.name}
               value={parameters[param.name]}
               onChange={handleParameterChange}
+              provider={provider}
             />
           ))}
         </div>
@@ -263,6 +267,7 @@ interface ParameterInputProps {
   name: string;
   value: unknown;
   onChange: (name: string, value: unknown) => void;
+  provider?: ProviderType;
 }
 
 /**
@@ -270,7 +275,7 @@ interface ParameterInputProps {
  * Text and number inputs use local state during editing to prevent
  * cursor-jump issues caused by React Flow re-renders on store updates.
  */
-function ParameterInputInner({ param, name, value, onChange }: ParameterInputProps) {
+function ParameterInputInner({ param, name, value, onChange, provider }: ParameterInputProps) {
   // Stable callback that passes name along with value
   const handleChange = useCallback((value: unknown) => {
     onChange(name, value);
@@ -292,6 +297,16 @@ function ParameterInputInner({ param, name, value, onChange }: ParameterInputPro
       setLocalValue(value === undefined || value === null ? "" : String(value));
     }
   }, [value]);
+
+  // Higgsfield Soul Style: render a special grouped dropdown
+  if (provider === "higgsfield" && name === "style_id") {
+    return (
+      <SoulStyleSelect
+        value={(value as string) ?? ""}
+        onChange={(val) => handleChange(val || undefined)}
+      />
+    );
+  }
 
   // Determine input type and render accordingly
   if (param.enum && param.enum.length > 0) {
@@ -450,6 +465,104 @@ function ParameterInputInner({ param, name, value, onChange }: ParameterInputPro
     </div>
   );
 }
+
+// ============ Soul Style Select ============
+
+interface SoulStyleEntry {
+  id: string;
+  name: string;
+}
+
+interface SoulStyleGroup {
+  category: string;
+  styles: SoulStyleEntry[];
+}
+
+/** Cache soul styles in-memory across component instances */
+let soulStylesCache: SoulStyleGroup[] | null = null;
+let soulStylesCacheTimestamp = 0;
+const SOUL_STYLES_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function SoulStyleSelectInner({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [groups, setGroups] = useState<SoulStyleGroup[]>(soulStylesCache || []);
+  const [isLoading, setIsLoading] = useState(!soulStylesCache);
+  const { higgsfieldApiKey } = useProviderApiKeys();
+
+  useEffect(() => {
+    // Use cache if still valid
+    if (soulStylesCache && Date.now() - soulStylesCacheTimestamp < SOUL_STYLES_CACHE_TTL) {
+      setGroups(soulStylesCache);
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchStyles = async () => {
+      setIsLoading(true);
+      try {
+        const headers: HeadersInit = {};
+        if (higgsfieldApiKey) {
+          headers["X-Higgsfield-Key"] = higgsfieldApiKey;
+        }
+        const response = await deduplicatedFetch("/api/higgsfield/soul-styles", { headers });
+        if (response.ok) {
+          const data = await response.json();
+          const grouped: SoulStyleGroup[] = data.groups || [];
+
+          soulStylesCache = grouped;
+          soulStylesCacheTimestamp = Date.now();
+          setGroups(grouped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch soul styles:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStyles();
+  }, [higgsfieldApiKey]);
+
+  if (isLoading && groups.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-neutral-400 shrink-0">Style</label>
+        <span className="text-[9px] text-neutral-500">Loading styles...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-[11px] text-neutral-400 shrink-0" title="Soul Style preset to apply">
+        Style
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 rounded-md bg-[#1a1a1a] focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
+      >
+        <option value="">None</option>
+        {groups.map((group) => (
+          <optgroup key={group.category} label={group.category}>
+            {group.styles.map((style) => (
+              <option key={style.id} value={style.id}>
+                {style.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+const SoulStyleSelect = React.memo(SoulStyleSelectInner);
 
 // Memoized exports to prevent unnecessary re-renders
 export const ModelParameters = React.memo(ModelParametersInner);

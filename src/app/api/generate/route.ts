@@ -13,11 +13,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GenerateRequest, GenerateResponse, ModelType, SelectedModel, ProviderType } from "@/types";
 import { GenerationInput, ModelCapability } from "@/lib/providers/types";
-import { generateWithGemini, generateWithGeminiVideo } from "./providers/gemini";
+import { generateWithGemini, generateWithGeminiVideo, extendVeoVideo } from "./providers/gemini";
 import { generateWithReplicate } from "./providers/replicate";
 import { clearFalInputMappingCache as _clearFalInputMappingCache, generateWithFalQueue } from "./providers/fal";
-import { generateWithKie } from "./providers/kie";
+import { generateWithKie, extendVeoKieVideo, getVeoApiModelId, isVeoModel as isKieVeoModel } from "./providers/kie";
 import { generateWithWaveSpeed } from "./providers/wavespeed";
+import { generateWithMuapi } from "./providers/muapi";
+import { generateWithHighsfield } from "./providers/higgsfield";
 
 // Re-export for backward compatibility (test file imports from route)
 export const clearFalInputMappingCache = _clearFalInputMappingCache;
@@ -34,6 +36,14 @@ interface MultiProviderGenerateRequest extends GenerateRequest {
   parameters?: Record<string, unknown>;
   /** Dynamic inputs from schema-based connections (e.g., image_url, tail_image_url, prompt) */
   dynamicInputs?: Record<string, string | string[]>;
+  /** Input videos as base64 data URLs or HTTP URLs (for video-to-video models) */
+  videos?: string[];
+  /** "extend" triggers Veo video extension instead of fresh generation */
+  action?: "extend";
+  /** Google-hosted video URI from a prior Veo generation; required when action="extend" for Gemini Veo */
+  veoVideoUri?: string;
+  /** Kie.ai task ID from a prior Veo 3.1 generation; required when action="extend" for Kie Veo */
+  kieVeoTaskId?: string;
 }
 
 
@@ -99,13 +109,18 @@ export async function POST(request: NextRequest) {
       selectedModel,
       parameters,
       dynamicInputs,
+      videos,
       mediaType,
+      action,
+      veoVideoUri,
+      kieVeoTaskId,
     } = body;
 
     // Prompt is required unless:
     // - Provided via dynamicInputs
     // - Images are provided (image-to-video/image-to-image models)
     // - Dynamic inputs contain image frames (first_frame, last_frame, etc.)
+    // - Videos are provided (video-to-video models like Topaz video upscale)
     const hasPrompt = prompt || (dynamicInputs && (
       typeof dynamicInputs.prompt === 'string'
         ? dynamicInputs.prompt
@@ -115,8 +130,11 @@ export async function POST(request: NextRequest) {
     const hasImageInputs = dynamicInputs && Object.keys(dynamicInputs).some(key =>
       key.includes('frame') || key.includes('image')
     );
+    const hasVideos = (videos && videos.length > 0) || (dynamicInputs && Object.keys(dynamicInputs).some(key =>
+      key === 'video_url' || key.includes('video')
+    ));
 
-    if (!hasPrompt && !hasImages && !hasImageInputs) {
+    if (!hasPrompt && !hasImages && !hasImageInputs && !hasVideos) {
       return NextResponse.json<GenerateResponse>(
         {
           success: false,
@@ -326,6 +344,56 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Handle Kie Veo extend action
+      if (action === "extend" && isKieVeoModel(selectedModel.modelId)) {
+        if (!kieVeoTaskId) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "kieVeoTaskId is required for Kie Veo extend action" },
+            { status: 400 }
+          );
+        }
+        const resolvedExtendPrompt = prompt || (dynamicInputs?.prompt
+          ? (Array.isArray(dynamicInputs.prompt) ? dynamicInputs.prompt[0] : dynamicInputs.prompt)
+          : undefined);
+        if (!resolvedExtendPrompt) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "A prompt is required to extend a Veo video" },
+            { status: 400 }
+          );
+        }
+
+        const extendResult = await extendVeoKieVideo(
+          requestId,
+          kieApiKey,
+          kieVeoTaskId,
+          resolvedExtendPrompt,
+          getVeoApiModelId(selectedModel.modelId),
+        );
+
+        if (!extendResult.success) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: extendResult.error || "Veo extend failed" },
+            { status: 500 }
+          );
+        }
+
+        const extendOutput = extendResult.outputs?.[0];
+        if (!extendOutput?.data && !extendOutput?.url) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "No output in Veo extend result" },
+            { status: 500 }
+          );
+        }
+
+        const extendMediaResponse = buildMediaResponse(extendOutput);
+        const extendResponseBody = await extendMediaResponse.json() as GenerateResponse;
+        const newKieTaskId = extendResult.metadata?.kieVeoTaskId as string | undefined;
+        return NextResponse.json<GenerateResponse>({
+          ...extendResponseBody,
+          ...(newKieTaskId ? { kieVeoTaskId: newKieTaskId } : {}),
+        });
+      }
+
       // Build generation input
       const genInput: GenerationInput = {
         model: {
@@ -337,6 +405,7 @@ export async function POST(request: NextRequest) {
         },
         prompt: prompt || "",
         images: processedImages,
+        videos: videos ? [...videos] : undefined,
         parameters,
         dynamicInputs: processedDynamicInputs,
       };
@@ -353,7 +422,150 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Return first output, attaching kieVeoTaskId for Veo models
+      const output = result.outputs?.[0];
+      if (!output?.data && !output?.url) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "No output in generation result" },
+          { status: 500 }
+        );
+      }
+
+      if (isKieVeoModel(selectedModel.modelId) && result.metadata?.kieVeoTaskId) {
+        const mediaResp = buildMediaResponse(output);
+        const mediaBody = await mediaResp.json() as GenerateResponse;
+        return NextResponse.json<GenerateResponse>({
+          ...mediaBody,
+          kieVeoTaskId: result.metadata.kieVeoTaskId as string,
+        });
+      }
+
+      return buildMediaResponse(output);
+    }
+
+    if (provider === "muapi") {
+      if (!selectedModel?.modelId || !selectedModel?.displayName) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "selectedModel with modelId and displayName is required for mu-api" },
+          { status: 400 }
+        );
+      }
+
+      const muapiApiKey = request.headers.get("X-Muapi-Key") || process.env.MUAPI_API_KEY;
+      if (!muapiApiKey) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: "mu-api API key not configured. Add MUAPI_API_KEY to .env.local or configure in Settings.",
+          },
+          { status: 401 }
+        );
+      }
+
+      // Pass images as-is; generateWithMuapi uploads base64 to mu-api CDN internally
+      const processedImages: string[] = images ? [...images] : [];
+
+      // Process dynamicInputs: filter empty values
+      let processedDynamicInputs: Record<string, string | string[]> | undefined = undefined;
+
+      if (dynamicInputs) {
+        processedDynamicInputs = {};
+        for (const key of Object.keys(dynamicInputs)) {
+          const value = dynamicInputs[key];
+
+          // Skip empty/null/undefined values
+          if (value === null || value === undefined || value === '') {
+            continue;
+          }
+
+          processedDynamicInputs[key] = value;
+        }
+      }
+
+      // Build generation input
+      const genInput: GenerationInput = {
+        model: {
+          id: selectedModel.modelId,
+          name: selectedModel.displayName,
+          provider: "muapi",
+          capabilities: capabilitiesForMediaType(mediaType),
+          description: null,
+        },
+        prompt: prompt || "",
+        images: processedImages,
+        videos: videos ? [...videos] : undefined,
+        parameters,
+        dynamicInputs: processedDynamicInputs,
+      };
+
+      const result = await generateWithMuapi(requestId, muapiApiKey, genInput);
+
+      if (!result.success) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: result.error || "Generation failed",
+          },
+          { status: 500 }
+        );
+      }
+
       // Return first output
+      const output = result.outputs?.[0];
+      if (!output?.data && !output?.url) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "No output in generation result" },
+          { status: 500 }
+        );
+      }
+
+      return buildMediaResponse(output);
+    }
+
+    if (provider === "higgsfield") {
+      if (!selectedModel?.modelId || !selectedModel?.displayName) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "selectedModel with modelId and displayName is required for Higgsfield" },
+          { status: 400 }
+        );
+      }
+
+      const higgsfieldApiKey = request.headers.get("X-Higgsfield-Key") || process.env.HIGGSFIELD_API_KEY;
+      if (!higgsfieldApiKey) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: "Higgsfield API key not configured. Add HIGGSFIELD_API_KEY=key:secret to .env.local or configure in Settings.",
+          },
+          { status: 401 }
+        );
+      }
+
+      const genInput: GenerationInput = {
+        model: {
+          id: selectedModel.modelId,
+          name: selectedModel.displayName,
+          provider: "higgsfield",
+          capabilities: capabilitiesForMediaType(mediaType),
+          description: null,
+        },
+        prompt: prompt || "",
+        images: [],
+        parameters,
+      };
+
+      const result = await generateWithHighsfield(requestId, higgsfieldApiKey, genInput);
+
+      if (!result.success) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: result.error || "Generation failed",
+          },
+          { status: 500 }
+        );
+      }
+
       const output = result.outputs?.[0];
       if (!output?.data && !output?.url) {
         return NextResponse.json<GenerateResponse>(
@@ -480,22 +692,47 @@ export async function POST(request: NextRequest) {
 
     // Check if this is a Veo video model request
     if (selectedModel?.modelId?.startsWith("veo-")) {
-      // Merge negative prompt from dynamic inputs (connected handle) into parameters
-      const veoParams = { ...(parameters || {}) };
-      if (dynamicInputs?.negative_prompt) {
-        const neg = Array.isArray(dynamicInputs.negative_prompt)
-          ? dynamicInputs.negative_prompt[0]
-          : dynamicInputs.negative_prompt;
-        if (neg) veoParams.negativePrompt = neg;
+      let result;
+
+      if (action === "extend") {
+        // Extend an existing Veo video — requires URI and prompt
+        if (!veoVideoUri) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "veoVideoUri is required for extend action" },
+            { status: 400 }
+          );
+        }
+        if (!resolvedPrompt) {
+          return NextResponse.json<GenerateResponse>(
+            { success: false, error: "A prompt is required to extend a video" },
+            { status: 400 }
+          );
+        }
+        result = await extendVeoVideo(
+          requestId,
+          geminiApiKey,
+          selectedModel.modelId,
+          veoVideoUri,
+          resolvedPrompt,
+        );
+      } else {
+        // Normal Veo generation
+        const veoParams = { ...(parameters || {}) };
+        if (dynamicInputs?.negative_prompt) {
+          const neg = Array.isArray(dynamicInputs.negative_prompt)
+            ? dynamicInputs.negative_prompt[0]
+            : dynamicInputs.negative_prompt;
+          if (neg) veoParams.negativePrompt = neg;
+        }
+        result = await generateWithGeminiVideo(
+          requestId,
+          geminiApiKey,
+          selectedModel.modelId,
+          resolvedPrompt || "",
+          images || [],
+          veoParams,
+        );
       }
-      const result = await generateWithGeminiVideo(
-        requestId,
-        geminiApiKey,
-        selectedModel.modelId,
-        resolvedPrompt || "",
-        images || [],
-        veoParams,
-      );
 
       if (!result.success) {
         return NextResponse.json<GenerateResponse>(
@@ -512,7 +749,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      const mediaResponse = buildMediaResponse(output);
+      // Attach veoVideoUri to the response so the executor can store it for future extends
+      const responseBody = await mediaResponse.json() as GenerateResponse;
+      const resultUri = result.metadata?.veoVideoUri as string | undefined;
+      return NextResponse.json<GenerateResponse>({
+        ...responseBody,
+        ...(resultUri ? { veoVideoUri: resultUri } : {}),
+      });
     }
 
     return await generateWithGemini(

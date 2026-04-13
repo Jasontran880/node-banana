@@ -31,11 +31,11 @@ function reorderColumnFirst<T>(items: T[], cols: number): T[] {
   return result;
 }
 
-// Base 10 aspect ratios (all Gemini image models)
-const BASE_ASPECT_RATIOS: AspectRatio[] = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
+// Base 10 aspect ratios (all Gemini image models) — "auto" lets the model infer from context
+const BASE_ASPECT_RATIOS: AspectRatio[] = ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
 
 // Extended 14 aspect ratios (Nano Banana 2 adds extreme ratios)
-const EXTENDED_ASPECT_RATIOS: AspectRatio[] = ["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
+const EXTENDED_ASPECT_RATIOS: AspectRatio[] = ["auto", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
 
 // Resolutions per model (nano-banana-pro: 1K-4K, nano-banana-2: 512-4K)
 const RESOLUTIONS_PRO: Resolution[] = ["1K", "2K", "4K"];
@@ -59,7 +59,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const generationsPath = useWorkflowStore((state) => state.generationsPath);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, replicateEnabled, kieEnabled } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, higgsfieldApiKey, replicateEnabled, kieEnabled, higgsfieldEnabled } = useProviderApiKeys();
   const [isLoadingCarouselImage, setIsLoadingCarouselImage] = useState(false);
   const [externalModels, setExternalModels] = useState<ProviderModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -74,6 +74,14 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     browseRegistry.register(id, () => setIsBrowseDialogOpen(true));
     return () => { browseRegistry.unregister(id); };
   }, [id]);
+
+  // Detect missing prompt: no text edge connected AND no inputPrompt stored
+  const missingPrompt = useWorkflowStore(
+    useCallback((state) => {
+      const hasTextEdge = state.edges.some((e) => e.target === id && e.targetHandle === "text");
+      return !hasTextEdge && !nodeData.inputPrompt;
+    }, [id, nodeData.inputPrompt])
+  );
 
   // Get the current selected provider (default to gemini)
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "gemini";
@@ -93,8 +101,12 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     if (kieEnabled && kieApiKey) {
       providers.push({ id: "kie", name: "Kie.ai" });
     }
+    // Add Higgsfield if configured
+    if (higgsfieldEnabled && higgsfieldApiKey) {
+      providers.push({ id: "higgsfield", name: "Higgsfield" });
+    }
     return providers;
-  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey]);
+  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, higgsfieldEnabled, higgsfieldApiKey]);
 
   // Migrate legacy data: derive selectedModel from model field if missing
   useEffect(() => {
@@ -131,6 +143,9 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       if (kieApiKey) {
         headers["X-Kie-Key"] = kieApiKey;
       }
+      if (higgsfieldApiKey) {
+        headers["X-Higgsfield-Key"] = higgsfieldApiKey;
+      }
       const response = await deduplicatedFetch(`/api/models?provider=${currentProvider}&capabilities=${capabilities}`, { headers });
       if (response.ok) {
         const data = await response.json();
@@ -153,7 +168,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     } finally {
       setIsLoadingModels(false);
     }
-  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey]);
+  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey, higgsfieldApiKey]);
 
   useEffect(() => {
     fetchModels();
@@ -341,6 +356,12 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     }
   }, [generationsPath]);
 
+  /** Load a carousel item: use inline data if present, otherwise fetch from disk. */
+  const loadCarouselImage = useCallback(async (imageItem: { id: string; data?: string }) => {
+    if (imageItem.data) return imageItem.data;
+    return loadImageById(imageItem.id);
+  }, [loadImageById]);
+
   const handleCarouselPrevious = useCallback(async () => {
     const history = nodeData.imageHistory || [];
     if (history.length === 0 || isLoadingCarouselImage) return;
@@ -350,7 +371,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     const imageItem = history[newIndex];
 
     setIsLoadingCarouselImage(true);
-    const image = await loadImageById(imageItem.id);
+    const image = await loadCarouselImage(imageItem);
     setIsLoadingCarouselImage(false);
 
     if (image) {
@@ -361,7 +382,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         error: null,
       });
     }
-  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadImageById, updateNodeData]);
+  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadCarouselImage, updateNodeData]);
 
   const handleCarouselNext = useCallback(async () => {
     const history = nodeData.imageHistory || [];
@@ -372,7 +393,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     const imageItem = history[newIndex];
 
     setIsLoadingCarouselImage(true);
-    const image = await loadImageById(imageItem.id);
+    const image = await loadCarouselImage(imageItem);
     setIsLoadingCarouselImage(false);
 
     if (image) {
@@ -383,7 +404,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         error: null,
       });
     }
-  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadImageById, updateNodeData]);
+  }, [id, nodeData.imageHistory, nodeData.selectedHistoryIndex, isLoadingCarouselImage, loadCarouselImage, updateNodeData]);
 
   // Handle model selection from browse dialog
   const handleBrowseModelSelect = useCallback((model: ProviderModel) => {
@@ -503,6 +524,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       selected={selected}
       isExecuting={isRunning}
       hasError={nodeData.status === "error"}
+      missingInput={missingPrompt}
       fullBleed
       settingsExpanded={inlineParametersEnabled && isParamsExpanded}
       aspectFitMedia={nodeData.outputImage}
@@ -532,13 +554,13 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
               <div key="aspect-ratio" className="flex items-center gap-2">
                 <label className="text-[11px] text-neutral-400 shrink-0">Aspect Ratio</label>
                 <select
-                  value={nodeData.aspectRatio || "1:1"}
+                  value={nodeData.aspectRatio || "auto"}
                   onChange={handleAspectRatioChange}
                   className="nodrag nopan flex-1 min-w-0 text-[11px] py-1 px-2 bg-[#1a1a1a] rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-600 text-white"
                 >
                   {aspectRatios.map((ratio) => (
                     <option key={ratio} value={ratio}>
-                      {ratio}
+                      {ratio === "auto" ? "Auto" : ratio}
                     </option>
                   ))}
                 </select>

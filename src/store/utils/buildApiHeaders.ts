@@ -16,6 +16,8 @@ const PROVIDER_HEADER_MAP: Record<ProviderType, string> = {
   fal: "X-Fal-API-Key",
   kie: "X-Kie-Key",
   wavespeed: "X-WaveSpeed-Key",
+  muapi: "X-Muapi-Key",
+  higgsfield: "X-Higgsfield-Key",
   openai: "X-OpenAI-API-Key",
   anthropic: "X-Anthropic-API-Key",
 };
@@ -70,6 +72,11 @@ export function buildLlmHeaders(
     const anthropicConfig = providerSettings.providers.anthropic;
     if (anthropicConfig?.apiKey) {
       headers["X-Anthropic-API-Key"] = anthropicConfig.apiKey;
+    }
+  } else if (llmProvider === "kie") {
+    const kieConfig = providerSettings.providers.kie;
+    if (kieConfig?.apiKey) {
+      headers["X-Kie-Key"] = kieConfig.apiKey;
     }
   }
 
