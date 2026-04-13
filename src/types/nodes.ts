@@ -53,7 +53,7 @@ export type NodeType =
 /**
  * Node execution status
  */
-export type NodeStatus = "idle" | "loading" | "complete" | "error";
+export type NodeStatus = "idle" | "loading" | "complete" | "error" | "skipped";
 
 /**
  * Image input node - loads/uploads images into the workflow
@@ -63,6 +63,7 @@ export interface ImageInputNodeData extends BaseNodeData {
   imageRef?: string; // External image reference for storage optimization
   filename: string | null;
   dimensions: { width: number; height: number } | null;
+  isOptional?: boolean;
 }
 
 /**
@@ -73,6 +74,7 @@ export interface AudioInputNodeData extends BaseNodeData {
   filename: string | null;       // Original filename for display
   duration: number | null;       // Duration in seconds
   format: string | null;         // MIME type (audio/mp3, audio/wav, etc.)
+  isOptional?: boolean;
 }
 
 /**
@@ -91,6 +93,7 @@ export interface VideoInputNodeData extends BaseNodeData {
 export interface PromptNodeData extends BaseNodeData {
   prompt: string;
   variableName?: string; // Optional variable name for use in PromptConstructor templates
+  isOptional?: boolean;
 }
 
 export type ArraySplitMode = "delimiter" | "newline" | "regex";

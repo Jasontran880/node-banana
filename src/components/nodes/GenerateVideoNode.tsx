@@ -314,6 +314,8 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       updateNodeData(id, {
         outputVideo: video,
         selectedVideoHistoryIndex: newIndex,
+        status: "idle",
+        error: null,
       });
     }
   }, [id, nodeData.videoHistory, nodeData.selectedVideoHistoryIndex, isLoadingCarouselVideo, loadVideoById, updateNodeData]);
@@ -334,6 +336,8 @@ export function GenerateVideoNode({ id, data, selected }: NodeProps<GenerateVide
       updateNodeData(id, {
         outputVideo: video,
         selectedVideoHistoryIndex: newIndex,
+        status: "idle",
+        error: null,
       });
     }
   }, [id, nodeData.videoHistory, nodeData.selectedVideoHistoryIndex, isLoadingCarouselVideo, loadVideoById, updateNodeData]);

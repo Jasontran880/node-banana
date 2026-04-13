@@ -5,7 +5,7 @@ import { generateWorkflowId, useWorkflowStore } from "@/store/workflowStore";
 import { ProviderType, ProviderSettings, NodeDefaultsConfig, LLMProvider, LLMModelType } from "@/types";
 import { CanvasNavigationSettings, PanMode, ZoomMode, SelectionMode } from "@/types/canvas";
 import { EnvStatusResponse } from "@/app/api/env-status/route";
-import { loadNodeDefaults, saveNodeDefaults } from "@/store/utils/localStorage";
+import { loadNodeDefaults, saveNodeDefaults, getLastProjectBaseDir, setLastProjectBaseDir } from "@/store/utils/localStorage";
 import { ProviderModel } from "@/lib/providers/types";
 import { ModelSearchDialog } from "@/components/modals/ModelSearchDialog";
 import { useInlineParameters } from "@/hooks/useInlineParameters";
@@ -203,7 +203,7 @@ export function ProjectSetupModal({
         setExternalStorage(useExternalImageStorage);
       } else if (mode === "new") {
         setName("");
-        setDirectoryPath("");
+        setDirectoryPath(getLastProjectBaseDir() || "");
         setExternalStorage(true);
       }
 
@@ -306,6 +306,8 @@ export function ProjectSetupModal({
       const id = mode === "new" ? generateWorkflowId() : useWorkflowStore.getState().workflowId || generateWorkflowId();
       // Update external storage setting
       setUseExternalImageStorage(externalStorage);
+      // Remember the base directory for next time
+      setLastProjectBaseDir(directoryPath);
       onSave(id, name.trim(), fullProjectPath);
       setIsValidating(false);
     } catch (err) {
