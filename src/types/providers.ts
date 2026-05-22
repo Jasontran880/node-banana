@@ -51,7 +51,8 @@ export type LLMModelType =
   | "claude-haiku-4.5"
   | "kie-claude-opus-4.6"
   | "kie-claude-sonnet-4.6"
-  | "kie-gpt-5.4";
+  | "kie-gpt-5.4"
+  | "kie-gpt-5.5";
 
 // Recently used models tracking
 export interface RecentModel {

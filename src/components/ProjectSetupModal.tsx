@@ -38,6 +38,7 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
     { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
     { value: "kie-gpt-5.4", label: "GPT 5.4" },
+    { value: "kie-gpt-5.5", label: "GPT 5.5" },
   ],
 };
 
@@ -1148,7 +1149,7 @@ export function ProjectSetupModal({
                   <input
                     type="range"
                     min="1"
-                    max="10"
+                    max="30"
                     step="1"
                     value={maxConcurrentCalls}
                     onChange={(e) => setMaxConcurrentCalls(parseInt(e.target.value, 10))}

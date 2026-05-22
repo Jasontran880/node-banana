@@ -31,12 +31,13 @@ const ANTHROPIC_MODEL_MAP: Record<string, string> = {
 
 // Kie.ai LLM models — Claude models use /claude/v1/messages, GPT uses /codex/v1/responses
 const KIE_CLAUDE_MODELS = new Set(["kie-claude-opus-4.6", "kie-claude-sonnet-4.6"]);
-const KIE_GPT_MODELS = new Set(["kie-gpt-5.4"]);
+const KIE_GPT_MODELS = new Set(["kie-gpt-5.4", "kie-gpt-5.5"]);
 
 const KIE_MODEL_ID_MAP: Record<string, string> = {
   "kie-claude-opus-4.6": "claude-opus-4-6",
   "kie-claude-sonnet-4.6": "claude-sonnet-4-6",
   "kie-gpt-5.4": "gpt-5-4",
+  "kie-gpt-5.5": "gpt-5-5",
 };
 
 async function generateWithGoogle(
