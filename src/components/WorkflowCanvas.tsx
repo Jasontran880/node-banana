@@ -326,6 +326,7 @@ export function WorkflowCanvas() {
   const [showNewProjectSetup, setShowNewProjectSetup] = useState(false);
   const [expandingNode, setExpandingNode] = useState<{ id: string; type: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const isBoxSelectingRef = useRef(false);
 
   // Detect if canvas is empty for showing quickstart
   const isCanvasEmpty = nodes.length === 0;
@@ -1686,8 +1687,16 @@ export function WorkflowCanvas() {
   // Fix for React Flow selection bug where nodes with undefined bounds get incorrectly selected.
   // Uses statistical outlier detection to identify and deselect nodes that are clearly
   // outside the actual selection area.
+  const handleSelectionStart = useCallback(() => {
+    isBoxSelectingRef.current = true;
+  }, []);
+
+  const handleSelectionEnd = useCallback(() => {
+    isBoxSelectingRef.current = false;
+  }, []);
+
   const handleSelectionChange = useCallback(({ nodes: selectedNodes }: OnSelectionChangeParams) => {
-    if (selectedNodes.length <= 1) return;
+    if (!isBoxSelectingRef.current || selectedNodes.length <= 1) return;
 
     // Get positions of all selected nodes
     const positions = selectedNodes.map(n => ({
@@ -2032,13 +2041,15 @@ export function WorkflowCanvas() {
         onMoveEnd={() => { isPanningRef.current = false; document.documentElement.classList.remove("canvas-interacting"); }}
         onNodeDragStart={() => { isDraggingNodeRef.current = true; document.documentElement.classList.add("canvas-interacting"); }}
         onNodeDragStop={(event, node) => { isDraggingNodeRef.current = false; document.documentElement.classList.remove("canvas-interacting"); handleNodeDragStop(event, node); }}
+        onSelectionStart={handleSelectionStart}
+        onSelectionEnd={handleSelectionEnd}
         onSelectionChange={handleSelectionChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         isValidConnection={isValidConnection}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
-        multiSelectionKeyCode="Shift"
+        multiSelectionKeyCode={["Shift", "Meta", "Control"]}
         selectionOnDrag={
           canvasNavigationSettings.selectionMode === "altDrag" || canvasNavigationSettings.selectionMode === "shiftDrag"
             ? false

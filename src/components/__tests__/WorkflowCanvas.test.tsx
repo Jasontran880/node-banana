@@ -19,6 +19,7 @@ const mockPasteNodes = vi.fn();
 const mockClearClipboard = vi.fn();
 const mockSetShowQuickstart = vi.fn();
 const mockUseWorkflowStore = vi.fn();
+const mockReactFlowProps = vi.fn();
 
 vi.mock("@/store/workflowStore", () => ({
   useWorkflowStore: (selector?: (state: unknown) => unknown) => {
@@ -38,8 +39,13 @@ const mockSetViewport = vi.fn();
 
 vi.mock("@xyflow/react", async () => {
   const actual = await vi.importActual("@xyflow/react");
+  const ActualReactFlow = actual.ReactFlow as React.ComponentType<Record<string, unknown>>;
   return {
     ...actual,
+    ReactFlow: (props: Record<string, unknown>) => {
+      mockReactFlowProps(props);
+      return <ActualReactFlow {...props} />;
+    },
     useReactFlow: () => ({
       screenToFlowPosition: mockScreenToFlowPosition,
       getViewport: mockGetViewport,
@@ -620,15 +626,74 @@ describe("WorkflowCanvas", () => {
       expect(document.querySelector(".react-flow")).toBeInTheDocument();
     });
 
-    it("should configure multi-selection with Shift key", () => {
+    it("should configure multi-selection with Shift, Cmd, and Ctrl keys", () => {
       render(
         <TestWrapper>
           <WorkflowCanvas />
         </TestWrapper>
       );
 
-      // ReactFlow is configured with multiSelectionKeyCode="Shift"
-      expect(document.querySelector(".react-flow")).toBeInTheDocument();
+      expect(mockReactFlowProps).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          multiSelectionKeyCode: ["Shift", "Meta", "Control"],
+        })
+      );
+    });
+
+    it("should not apply drag-selection outlier cleanup during click multi-selection", () => {
+      render(
+        <TestWrapper>
+          <WorkflowCanvas />
+        </TestWrapper>
+      );
+
+      const props = mockReactFlowProps.mock.lastCall?.[0];
+      expect(props).toBeDefined();
+
+      mockOnNodesChange.mockClear();
+      (props.onSelectionChange as Function)({
+        nodes: [
+          createMockNode("node-1", "prompt", { selected: true, position: { x: 0, y: 0 } }),
+          createMockNode("node-2", "prompt", { selected: true, position: { x: 10, y: 0 } }),
+          createMockNode("node-3", "prompt", { selected: true, position: { x: 20, y: 0 } }),
+          createMockNode("node-4", "prompt", { selected: true, position: { x: 30, y: 0 } }),
+          createMockNode("node-5", "prompt", { selected: true, position: { x: 1000, y: 0 } }),
+        ],
+        edges: [],
+      });
+
+      expect(mockOnNodesChange).not.toHaveBeenCalled();
+    });
+
+    it("should still apply outlier cleanup while box-selecting", () => {
+      render(
+        <TestWrapper>
+          <WorkflowCanvas />
+        </TestWrapper>
+      );
+
+      const props = mockReactFlowProps.mock.lastCall?.[0];
+      expect(props).toBeDefined();
+
+      (props.onSelectionStart as Function)();
+      (props.onSelectionChange as Function)({
+        nodes: [
+          createMockNode("node-1", "prompt", { selected: true, position: { x: 0, y: 0 } }),
+          createMockNode("node-2", "prompt", { selected: true, position: { x: 10, y: 0 } }),
+          createMockNode("node-3", "prompt", { selected: true, position: { x: 20, y: 0 } }),
+          createMockNode("node-4", "prompt", { selected: true, position: { x: 30, y: 0 } }),
+          createMockNode("node-5", "prompt", { selected: true, position: { x: 1000, y: 0 } }),
+        ],
+        edges: [],
+      });
+
+      expect(mockOnNodesChange).toHaveBeenCalledWith([
+        {
+          type: "select",
+          id: "node-5",
+          selected: false,
+        },
+      ]);
     });
 
     it("should configure zoom constraints", () => {
