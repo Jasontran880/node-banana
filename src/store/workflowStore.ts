@@ -58,6 +58,7 @@ import {
   groupNodesByLevel,
   chunk,
   clearNodeImageRefs,
+  stripCarouselImageData,
 } from "./utils/executionUtils";
 import { getConnectedInputsPure, validateWorkflowPure, RunNodeOutputs } from "./utils/connectedInputs";
 import { evaluateRule } from "./utils/ruleEvaluation";
@@ -1575,7 +1576,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   setMaxConcurrentCalls: (value: number) => {
-    const clamped = Math.max(1, Math.min(20, value));
+    const clamped = Math.max(1, Math.min(30, value));
     saveConcurrencySetting(clamped);
     set({ maxConcurrentCalls: clamped });
   },
@@ -2290,6 +2291,10 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       if (useExternalImageStorage) {
         workflow = await externalizeWorkflowImages(workflow, saveDirectoryPath);
       }
+
+      // Strip inline base64 cache from carousel history items to prevent
+      // JSON.stringify hitting JS's max string length with many generation nodes
+      workflow = { ...workflow, nodes: stripCarouselImageData(workflow.nodes) };
 
       const response = await fetch("/api/workflow", {
         method: "POST",

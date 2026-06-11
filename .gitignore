@@ -6,7 +6,12 @@
 
 # testing
 /coverage
-/projects
+
+# project metadata is commit-worthy; generated media is not
+/projects/**
+!/projects/**/
+!/projects/*.json
+!/projects/**/*.json
 
 # next.js
 /.next/
