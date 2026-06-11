@@ -185,6 +185,140 @@ function buildConnectionEdgeData(
   return baseData;
 }
 
+function getGroupedMovementFromChange(
+  change: NodeChange<WorkflowNode>,
+  nodeById: Map<string, WorkflowNode>,
+  groups: Record<string, NodeGroup>,
+  fullySelectedGroupIds: Set<string>
+): { groupId: string; dx: number; dy: number; dragging?: boolean } | null {
+  let nodeId: string | null = null;
+  let nextPosition: XYPosition | undefined;
+  let dragging: boolean | undefined;
+
+  if (change.type === "position" && change.position) {
+    nodeId = change.id;
+    nextPosition = change.position;
+    dragging = change.dragging;
+  } else if (change.type === "replace") {
+    nodeId = change.id;
+    nextPosition = change.item.position;
+    dragging = change.item.dragging;
+  }
+
+  if (!nodeId || !nextPosition) return null;
+
+  const node = nodeById.get(nodeId);
+  if (!node?.groupId || !groups[node.groupId]) return null;
+  if (!fullySelectedGroupIds.has(node.groupId)) return null;
+
+  const dx = nextPosition.x - node.position.x;
+  const dy = nextPosition.y - node.position.y;
+  if (dx === 0 && dy === 0) return null;
+
+  return { groupId: node.groupId, dx, dy, dragging };
+}
+
+function getFullySelectedGroupIds(
+  changes: NodeChange<WorkflowNode>[],
+  nodes: WorkflowNode[],
+  groups: Record<string, NodeGroup>
+): Set<string> {
+  const selectedById = new Map(nodes.map((node) => [node.id, !!node.selected]));
+
+  changes.forEach((change) => {
+    if (change.type === "select") {
+      selectedById.set(change.id, change.selected);
+    } else if (change.type === "replace" && typeof change.item.selected === "boolean") {
+      selectedById.set(change.id, change.item.selected);
+    }
+  });
+
+  const groupSelection = new Map<string, { total: number; selected: number }>();
+
+  nodes.forEach((node) => {
+    if (!node.groupId || !groups[node.groupId]) return;
+
+    const stats = groupSelection.get(node.groupId) || { total: 0, selected: 0 };
+    stats.total += 1;
+    if (selectedById.get(node.id)) {
+      stats.selected += 1;
+    }
+    groupSelection.set(node.groupId, stats);
+  });
+
+  const fullySelectedGroupIds = new Set<string>();
+  groupSelection.forEach((stats, groupId) => {
+    if (stats.total > 0 && stats.selected === stats.total) {
+      fullySelectedGroupIds.add(groupId);
+    }
+  });
+
+  return fullySelectedGroupIds;
+}
+
+function applyGroupedNodeChanges(
+  changes: NodeChange<WorkflowNode>[],
+  nodes: WorkflowNode[],
+  groups: Record<string, NodeGroup>
+): { nodes: WorkflowNode[]; groups: Record<string, NodeGroup> } {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const fullySelectedGroupIds = getFullySelectedGroupIds(changes, nodes, groups);
+  const groupMovements = new Map<string, { dx: number; dy: number; dragging?: boolean }>();
+  const groupedMovementChangeIndexes = new Set<number>();
+
+  changes.forEach((change, index) => {
+    const movement = getGroupedMovementFromChange(change, nodeById, groups, fullySelectedGroupIds);
+    if (!movement) return;
+
+    if (!groupMovements.has(movement.groupId)) {
+      groupMovements.set(movement.groupId, {
+        dx: movement.dx,
+        dy: movement.dy,
+        dragging: movement.dragging,
+      });
+    }
+    groupedMovementChangeIndexes.add(index);
+  });
+
+  if (groupMovements.size === 0) {
+    return { nodes: applyNodeChanges(changes, nodes), groups };
+  }
+
+  const passThroughChanges = changes.filter((_, index) => !groupedMovementChangeIndexes.has(index));
+  const changedNodes = applyNodeChanges(passThroughChanges, nodes) as WorkflowNode[];
+  const changedGroups = { ...groups };
+
+  groupMovements.forEach((movement, groupId) => {
+    const group = changedGroups[groupId];
+    if (!group) return;
+
+    changedGroups[groupId] = {
+      ...group,
+      position: {
+        x: group.position.x + movement.dx,
+        y: group.position.y + movement.dy,
+      },
+    };
+  });
+
+  return {
+    nodes: changedNodes.map((node) => {
+      const movement = node.groupId ? groupMovements.get(node.groupId) : undefined;
+      if (!movement) return node;
+
+      return {
+        ...node,
+        position: {
+          x: node.position.x + movement.dx,
+          y: node.position.y + movement.dy,
+        },
+        ...(typeof movement.dragging === "boolean" ? { dragging: movement.dragging } : {}),
+      };
+    }) as WorkflowNode[],
+    groups: changedGroups,
+  };
+}
+
 // Workflow file format
 export interface WorkflowFile {
   version: 1;
@@ -201,6 +335,7 @@ export interface WorkflowFile {
 interface ClipboardData {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  groups?: Record<string, NodeGroup>;
 }
 
 interface WorkflowStore {
@@ -628,10 +763,15 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     // Track manual changes only for remove operations (not position/selection/dimensions)
     const hasRemoveChange = changes.some((c) => c.type === "remove");
 
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes),
-      ...(hasMeaningfulChange ? { hasUnsavedChanges: true } : {}),
-    }));
+    set((state) => {
+      const groupedChanges = applyGroupedNodeChanges(changes, state.nodes, state.groups);
+
+      return {
+        nodes: groupedChanges.nodes,
+        groups: groupedChanges.groups,
+        ...(hasMeaningfulChange ? { hasUnsavedChanges: true } : {}),
+      };
+    });
 
     if (hasRemoveChange) {
       get().incrementManualChangeCount();
@@ -726,12 +866,17 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   copySelectedNodes: () => {
-    const { nodes, edges } = get();
+    const { nodes, edges, groups } = get();
     const selectedNodes = nodes.filter((node) => node.selected);
 
     if (selectedNodes.length === 0) return;
 
     const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
+    const selectedGroupIds = new Set(
+      selectedNodes
+        .map((node) => node.groupId)
+        .filter((groupId): groupId is string => !!groupId && !!groups[groupId])
+    );
 
     // Edges between selected nodes (both endpoints being pasted)
     const internalEdges = edges.filter(
@@ -746,17 +891,23 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     // Deep clone to avoid reference issues
     const clonedNodes = JSON.parse(JSON.stringify(selectedNodes)) as WorkflowNode[];
     const clonedEdges = JSON.parse(JSON.stringify([...internalEdges, ...externalIncomingEdges])) as WorkflowEdge[];
+    const clonedGroups = selectedGroupIds.size > 0
+      ? JSON.parse(JSON.stringify(
+          Object.fromEntries([...selectedGroupIds].map((groupId) => [groupId, groups[groupId]]))
+        )) as Record<string, NodeGroup>
+      : undefined;
 
-    set({ clipboard: { nodes: clonedNodes, edges: clonedEdges } });
+    set({ clipboard: { nodes: clonedNodes, edges: clonedEdges, groups: clonedGroups } });
   },
 
   pasteNodes: (offset: XYPosition = { x: 50, y: 50 }) => {
-    const { clipboard, nodes, edges } = get();
+    const { clipboard, nodes, edges, groups } = get();
 
     if (!clipboard || clipboard.nodes.length === 0) return;
 
     // Create a mapping from old node IDs to new node IDs
     const idMapping = new Map<string, string>();
+    const groupIdMapping = new Map<string, string>();
 
     // Generate new IDs for all pasted nodes
     clipboard.nodes.forEach((node) => {
@@ -764,12 +915,25 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       idMapping.set(node.id, newId);
     });
 
+    const reservedGroupIds = new Set(Object.keys(groups));
+    Object.keys(clipboard.groups || {}).forEach((groupId) => {
+      let newGroupId = "";
+      do {
+        newGroupId = `group-${++groupIdCounter}`;
+      } while (reservedGroupIds.has(newGroupId));
+
+      reservedGroupIds.add(newGroupId);
+      groupIdMapping.set(groupId, newGroupId);
+    });
+
     // Create new nodes with updated IDs and offset positions
     const newNodes: WorkflowNode[] = clipboard.nodes.map((node) => {
       const defaults = defaultNodeDimensions[node.type as NodeType] || { width: 300, height: 280 };
+      const newGroupId = node.groupId ? groupIdMapping.get(node.groupId) : undefined;
       return {
         ...node,
         id: idMapping.get(node.id)!,
+        groupId: newGroupId,
         position: {
           x: node.position.x + offset.x,
           y: node.position.y + offset.y,
@@ -784,6 +948,23 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         data: JSON.parse(JSON.stringify(node.data)),
       };
     });
+
+    const newGroups = Object.fromEntries(
+      Object.entries(clipboard.groups || {}).map(([oldGroupId, group]) => {
+        const newGroupId = groupIdMapping.get(oldGroupId)!;
+        return [
+          newGroupId,
+          {
+            ...group,
+            id: newGroupId,
+            position: {
+              x: group.position.x + offset.x,
+              y: group.position.y + offset.y,
+            },
+          },
+        ];
+      })
+    ) as Record<string, NodeGroup>;
 
     // Create new edges, handling both internal (both endpoints pasted) and
     // external incoming (source is an existing canvas node, target is pasted).
@@ -807,6 +988,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     set({
       nodes: [...updatedNodes, ...newNodes] as WorkflowNode[],
       edges: [...edges, ...newEdges],
+      groups: { ...groups, ...newGroups },
       hasUnsavedChanges: true,
     });
 
