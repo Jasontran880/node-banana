@@ -873,10 +873,27 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     if (selectedNodes.length === 0) return;
 
     const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
+
+    // A group is only "copied" when ALL of its member nodes are selected.
+    // Copying a subset (e.g. a single node) should paste standalone nodes, not
+    // duplicate the whole group container. This mirrors group-movement, which
+    // also only treats a group as a unit when fully selected.
+    const groupMemberCounts = new Map<string, number>();
+    nodes.forEach((node) => {
+      if (node.groupId && groups[node.groupId]) {
+        groupMemberCounts.set(node.groupId, (groupMemberCounts.get(node.groupId) ?? 0) + 1);
+      }
+    });
+    const selectedGroupCounts = new Map<string, number>();
+    selectedNodes.forEach((node) => {
+      if (node.groupId && groups[node.groupId]) {
+        selectedGroupCounts.set(node.groupId, (selectedGroupCounts.get(node.groupId) ?? 0) + 1);
+      }
+    });
     const selectedGroupIds = new Set(
-      selectedNodes
-        .map((node) => node.groupId)
-        .filter((groupId): groupId is string => !!groupId && !!groups[groupId])
+      [...selectedGroupCounts.entries()]
+        .filter(([groupId, count]) => count === groupMemberCounts.get(groupId))
+        .map(([groupId]) => groupId)
     );
 
     // Edges between selected nodes (both endpoints being pasted)
@@ -889,8 +906,14 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       (edge) => !selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
     );
 
-    // Deep clone to avoid reference issues
-    const clonedNodes = JSON.parse(JSON.stringify(selectedNodes)) as WorkflowNode[];
+    // Deep clone to avoid reference issues. Drop groupId from any node whose
+    // group is not fully selected so it pastes as a standalone node.
+    const clonedNodes = (JSON.parse(JSON.stringify(selectedNodes)) as WorkflowNode[]).map(
+      (node) =>
+        node.groupId && !selectedGroupIds.has(node.groupId)
+          ? { ...node, groupId: undefined }
+          : node
+    );
     const clonedEdges = JSON.parse(JSON.stringify([...internalEdges, ...externalIncomingEdges])) as WorkflowEdge[];
     const clonedGroups = selectedGroupIds.size > 0
       ? JSON.parse(JSON.stringify(
