@@ -126,7 +126,7 @@ export function ModelSearchDialog({
     trackModelUsage,
   } = useWorkflowStore();
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, muapiApiKey } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, geminiAgentApiKey } = useProviderApiKeys();
   const { screenToFlowPosition } = useReactFlow();
 
   // State
@@ -235,6 +235,9 @@ export function ModelSearchDialog({
       if (muapiApiKey) {
         headers["X-Muapi-Key"] = muapiApiKey;
       }
+      if (geminiAgentApiKey) {
+        headers["X-Gemini-Agent-Key"] = geminiAgentApiKey;
+      }
 
       const response = await deduplicatedFetch(`/api/models?${params.toString()}`, {
         headers,
@@ -272,7 +275,7 @@ export function ModelSearchDialog({
         setIsLoading(false);
       }
     }
-  }, [debouncedSearch, providerFilter, capabilityFilter, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, muapiApiKey]);
+  }, [debouncedSearch, providerFilter, capabilityFilter, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, geminiAgentApiKey]);
 
   // Fetch models when filters change
   useEffect(() => {
@@ -388,6 +391,8 @@ export function ModelSearchDialog({
     switch (provider) {
       case "gemini":
         return "bg-green-500/20 text-green-300";
+      case "geminiAgent":
+        return "bg-emerald-500/20 text-emerald-300";
       case "replicate":
         return "bg-blue-500/20 text-blue-300";
       case "fal":
@@ -408,6 +413,8 @@ export function ModelSearchDialog({
     switch (provider) {
       case "gemini":
         return "Gemini";
+      case "geminiAgent":
+        return "Agent Platform";
       case "replicate":
         return "Replicate";
       case "fal":
@@ -431,12 +438,13 @@ export function ModelSearchDialog({
     if (kieApiKey) providers.add("kie");
     if (wavespeedApiKey) providers.add("wavespeed");
     if (muapiApiKey) providers.add("muapi");
+    if (geminiAgentApiKey) providers.add("geminiAgent");
     // Server-side keys (from env vars, reported by /api/models)
     for (const p of serverAvailableProviders) {
       providers.add(p as ProviderType);
     }
     return providers;
-  }, [replicateApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, serverAvailableProviders]);
+  }, [replicateApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, geminiAgentApiKey, serverAvailableProviders]);
 
   // Reset provider filter if current selection becomes unavailable
   useEffect(() => {
@@ -714,6 +722,19 @@ export function ModelSearchDialog({
                   }`}
                 >
                   mu
+                </button>
+              )}
+              {availableProviders.has("geminiAgent") && (
+                <button
+                  onClick={() => setProviderFilter("geminiAgent")}
+                  title="Gemini Agent Platform"
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    providerFilter === "geminiAgent"
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "text-neutral-400 hover:text-emerald-300 hover:bg-neutral-700"
+                  }`}
+                >
+                  GA
                 </button>
               )}
             </div>

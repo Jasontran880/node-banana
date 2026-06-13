@@ -30,9 +30,11 @@ export async function generateWithGemini(
   aspectRatio?: string,
   resolution?: string,
   useGoogleSearch?: boolean,
-  useImageSearch?: boolean
+  useImageSearch?: boolean,
+  clientOptions?: { vertexai?: boolean }
 ): Promise<NextResponse<GenerateResponse>> {
-  console.log(`[API:${requestId}] Gemini generation - Model: ${model}, Images: ${images?.length || 0}, Prompt: ${prompt?.length || 0} chars`);
+  const platform = clientOptions?.vertexai ? "Agent Platform (Vertex)" : "Gemini Developer API";
+  console.log(`[API:${requestId}] Gemini generation - Platform: ${platform}, Model: ${model}, Images: ${images?.length || 0}, Prompt: ${prompt?.length || 0} chars`);
 
   // Extract base64 data and MIME types from data URLs
   const imageData = (images || []).map((image, idx) => {
@@ -48,8 +50,12 @@ export async function generateWithGemini(
     return { data: image, mimeType: "image/png" };
   });
 
-  // Initialize Gemini client
-  const ai = new GoogleGenAI({ apiKey });
+  // Initialize Gemini client. When vertexai is set, the API key is used in
+  // Vertex AI "express mode" against the Gemini Enterprise Agent Platform
+  // (aiplatform.googleapis.com); otherwise the AI Studio Gemini Developer API.
+  const ai = new GoogleGenAI(
+    clientOptions?.vertexai ? { vertexai: true, apiKey } : { apiKey }
+  );
 
   // Build request parts array with prompt and all images
   const requestParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [

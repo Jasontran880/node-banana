@@ -458,6 +458,22 @@ const GEMINI_IMAGE_MODELS: ProviderModel[] = [
   },
 ];
 
+// Gemini Enterprise Agent Platform models (Vertex express mode via API key).
+// Same underlying model as the Gemini Developer API path, but billed/served
+// through the Agent Platform with a separate API key.
+const GEMINI_AGENT_MODELS: ProviderModel[] = [
+  {
+    id: "nano-banana-pro",
+    name: "Nano Banana Pro (Agent Platform)",
+    description: "Gemini 3 Pro Image (Nano Banana Pro) via the Gemini Enterprise Agent Platform. Text-to-image and image-to-image with resolution control (1K/2K/4K) and Search grounding.",
+    provider: "geminiAgent",
+    capabilities: ["text-to-image", "image-to-image"],
+    coverImage: undefined,
+    pricing: { type: "per-run", amount: 0.134, currency: "USD" },
+    pageUrl: "https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-pro-image",
+  },
+];
+
 // Gemini video models (native Veo via Gemini API)
 const GEMINI_VIDEO_MODELS: ProviderModel[] = [
   {
@@ -1064,6 +1080,7 @@ export async function GET(
   const wavespeedKey = request.headers.get("X-WaveSpeed-Key") || process.env.WAVESPEED_API_KEY || null;
   const muapiKey = request.headers.get("X-Muapi-Key") || process.env.MUAPI_API_KEY || null;
   const higgsfieldKey = request.headers.get("X-Higgsfield-Key") || process.env.HIGGSFIELD_API_KEY || null;
+  const geminiAgentKey = request.headers.get("X-Gemini-Agent-Key") || process.env.GEMINI_AGENT_API_KEY || null;
 
   // Build list of all available providers (have keys from env or client headers)
   const availableProviders: string[] = ["gemini"]; // Gemini always available
@@ -1073,10 +1090,12 @@ export async function GET(
   if (wavespeedKey) availableProviders.push("wavespeed");
   if (muapiKey) availableProviders.push("muapi");
   if (higgsfieldKey) availableProviders.push("higgsfield");
+  if (geminiAgentKey) availableProviders.push("geminiAgent");
 
   // Determine which providers to fetch from (excluding gemini/kie - handled separately as hardcoded)
   const providersToFetch: ProviderType[] = [];
   let includeGemini = false;
+  let includeGeminiAgent = false;
   let includeKie = false;
   let includeMuapi = false;
   let includeHighsfield = false;
@@ -1085,6 +1104,19 @@ export async function GET(
     if (providerFilter === "gemini") {
       // Only Gemini requested - no external API calls needed
       includeGemini = true;
+    } else if (providerFilter === "geminiAgent") {
+      // Only Agent Platform requested - hardcoded models, requires key
+      if (geminiAgentKey) {
+        includeGeminiAgent = true;
+      } else {
+        return NextResponse.json<ModelsErrorResponse>(
+          {
+            success: false,
+            error: "Agent Platform API key required. Add GEMINI_AGENT_API_KEY to .env.local or configure in Settings.",
+          },
+          { status: 400 }
+        );
+      }
     } else if (providerFilter === "kie") {
       // Only Kie requested - no external API calls needed (hardcoded models)
       if (kieKey) {
@@ -1145,6 +1177,7 @@ export async function GET(
   } else {
     // Include all providers that have keys configured
     includeGemini = true; // Gemini always available
+    includeGeminiAgent = geminiAgentKey ? true : false; // Agent Platform only if API key is configured
     includeKie = kieKey ? true : false; // Kie only if API key is configured
     includeMuapi = muapiKey ? true : false; // mu-api only if API key is configured
     includeHighsfield = higgsfieldKey ? true : false; // Higgsfield only if API key is configured
@@ -1160,7 +1193,7 @@ export async function GET(
   }
 
   // Gemini and Kie are always available (with key for Kie), so we don't fail if no external providers
-  if (providersToFetch.length === 0 && !includeGemini && !includeKie && !includeMuapi && !includeHighsfield) {
+  if (providersToFetch.length === 0 && !includeGemini && !includeGeminiAgent && !includeKie && !includeMuapi && !includeHighsfield) {
     return NextResponse.json<ModelsErrorResponse>(
       {
         success: false,
@@ -1189,6 +1222,21 @@ export async function GET(
       success: true,
       count: geminiModels.length,
       cached: true, // Hardcoded models are effectively "cached"
+    };
+    anyFromCache = true;
+  }
+
+  // Add Agent Platform models if included (hardcoded, requires key)
+  if (includeGeminiAgent) {
+    let geminiAgentModels = GEMINI_AGENT_MODELS;
+    if (searchQuery) {
+      geminiAgentModels = filterModelsBySearch(geminiAgentModels, searchQuery);
+    }
+    allModels.push(...geminiAgentModels);
+    providerResults["geminiAgent"] = {
+      success: true,
+      count: geminiAgentModels.length,
+      cached: true,
     };
     anyFromCache = true;
   }

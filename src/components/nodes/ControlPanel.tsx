@@ -78,8 +78,11 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
   ],
   kie: [
+    { value: "kie-gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    { value: "kie-gemini-3.5-flash", label: "Gemini 3.5 Flash" },
     { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
     { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "kie-claude-haiku-4.6", label: "Claude Haiku 4.6" },
     { value: "kie-gpt-5.4", label: "GPT 5.4" },
     { value: "kie-gpt-5.5", label: "GPT 5.5" },
   ],
@@ -785,7 +788,7 @@ function LLMControls({ node }: { node: Node }) {
         provider: newProvider,
         model: firstModelForProvider,
       };
-      if (newProvider === "anthropic" && nodeData.temperature > 1) {
+      if ((newProvider === "anthropic" || newProvider === "kie") && nodeData.temperature > 1) {
         updates.temperature = 1;
       }
       updateNodeData(node.id, updates);
@@ -852,7 +855,7 @@ function LLMControls({ node }: { node: Node }) {
         <input
           type="range"
           min="0"
-          max={provider === "anthropic" ? "1" : "2"}
+          max={provider === "anthropic" || provider === "kie" ? "1" : "2"}
           step="0.01"
           value={nodeData.temperature ?? 0.7}
           onChange={handleTemperatureChange}

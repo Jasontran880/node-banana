@@ -35,8 +35,11 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
   ],
   kie: [
+    { value: "kie-gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    { value: "kie-gemini-3.5-flash", label: "Gemini 3.5 Flash" },
     { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
     { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "kie-claude-haiku-4.6", label: "Claude Haiku 4.6" },
     { value: "kie-gpt-5.4", label: "GPT 5.4" },
     { value: "kie-gpt-5.5", label: "GPT 5.5" },
   ],
@@ -75,6 +78,7 @@ const WaveSpeedIcon = () => (
 const getProviderIcon = (provider: ProviderType) => {
   switch (provider) {
     case "gemini":
+    case "geminiAgent":
       return <GeminiIcon />;
     case "replicate":
       return <ReplicateIcon />;
@@ -166,6 +170,7 @@ export function ProjectSetupModal({
   const [localProviders, setLocalProviders] = useState<ProviderSettings>(providerSettings);
   const [showApiKey, setShowApiKey] = useState<Record<ProviderType, boolean>>({
     gemini: false,
+    geminiAgent: false,
     openai: false,
     anthropic: false,
     replicate: false,
@@ -177,6 +182,7 @@ export function ProjectSetupModal({
   });
   const [overrideActive, setOverrideActive] = useState<Record<ProviderType, boolean>>({
     gemini: false,
+    geminiAgent: false,
     openai: false,
     anthropic: false,
     replicate: false,
@@ -216,10 +222,11 @@ export function ProjectSetupModal({
 
       // Sync local providers state
       setLocalProviders(providerSettings);
-      setShowApiKey({ gemini: false, openai: false, anthropic: false, replicate: false, fal: false, kie: false, wavespeed: false, higgsfield: false, muapi: false });
+      setShowApiKey({ gemini: false, geminiAgent: false, openai: false, anthropic: false, replicate: false, fal: false, kie: false, wavespeed: false, higgsfield: false, muapi: false });
       // Initialize override as active if user already has a key set
       setOverrideActive({
         gemini: !!providerSettings.providers.gemini?.apiKey,
+        geminiAgent: !!providerSettings.providers.geminiAgent?.apiKey,
         openai: !!providerSettings.providers.openai?.apiKey,
         anthropic: !!providerSettings.providers.anthropic?.apiKey,
         replicate: !!providerSettings.providers.replicate?.apiKey,
@@ -325,7 +332,7 @@ export function ProjectSetupModal({
 
   const handleSaveProviders = () => {
     // Save each provider's settings
-    const providerIds: ProviderType[] = ["gemini", "openai", "anthropic", "replicate", "fal", "kie", "wavespeed", "higgsfield"];
+    const providerIds: ProviderType[] = ["gemini", "geminiAgent", "openai", "anthropic", "replicate", "fal", "kie", "wavespeed", "higgsfield"];
     for (const providerId of providerIds) {
       const local = localProviders.providers[providerId];
       const current = providerSettings.providers[providerId];
@@ -919,6 +926,54 @@ export function ProjectSetupModal({
               </div>
             </div>
 
+            {/* Gemini Agent Platform Provider */}
+            <div className="p-3 bg-neutral-900 rounded-lg border border-neutral-700">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-neutral-100">Gemini Agent Platform</span>
+                {envStatus?.geminiAgent && !overrideActive.geminiAgent ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-green-400">Configured via .env</span>
+                    <button
+                      type="button"
+                      onClick={() => setOverrideActive((prev) => ({ ...prev, geminiAgent: true }))}
+                      className="px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
+                    >
+                      Override
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type={showApiKey.geminiAgent ? "text" : "password"}
+                      value={localProviders.providers.geminiAgent?.apiKey || ""}
+                      onChange={(e) => updateLocalProvider("geminiAgent", { apiKey: e.target.value || null })}
+                      placeholder="Agent Platform API key"
+                      className="w-48 px-2 py-1 bg-neutral-800 border border-neutral-600 rounded-lg text-neutral-100 text-xs focus:outline-none focus:border-neutral-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey((prev) => ({ ...prev, geminiAgent: !prev.geminiAgent }))}
+                      className="text-xs text-neutral-400 hover:text-neutral-200"
+                    >
+                      {showApiKey.geminiAgent ? "Hide" : "Show"}
+                    </button>
+                    {envStatus?.geminiAgent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOverrideActive((prev) => ({ ...prev, geminiAgent: false }));
+                          updateLocalProvider("geminiAgent", { apiKey: null });
+                        }}
+                        className="text-xs text-neutral-500 hover:text-neutral-300"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <p className="text-xs text-neutral-400 mt-2">
               Add API keys via <code className="px-1 py-0.5 bg-neutral-800 rounded">.env.local</code> for better security. Keys added here override .env and are stored in your browser.
             </p>
@@ -1060,8 +1115,8 @@ export function ProjectSetupModal({
                           ...prev.llm,
                           provider: newProvider,
                           model: firstModelForProvider,
-                          // Clamp temperature for Anthropic (max 1.0)
-                          ...(newProvider === "anthropic" && currentTemp > 1 ? { temperature: 1 } : {}),
+                          // Clamp temperature for providers with max 1.0.
+                          ...((newProvider === "anthropic" || newProvider === "kie") && currentTemp > 1 ? { temperature: 1 } : {}),
                         }
                       }));
                     }}
@@ -1100,7 +1155,7 @@ export function ProjectSetupModal({
                   <input
                     type="range"
                     min="0"
-                    max={(localNodeDefaults.llm?.provider || "google") === "anthropic" ? "1" : "2"}
+                    max={(localNodeDefaults.llm?.provider || "google") === "anthropic" || (localNodeDefaults.llm?.provider || "google") === "kie" ? "1" : "2"}
                     step="0.1"
                     value={localNodeDefaults.llm?.temperature ?? 0.7}
                     onChange={(e) => {

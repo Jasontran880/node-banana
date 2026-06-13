@@ -6,7 +6,7 @@
  */
 
 // Provider Types for multi-provider support (image/video generation)
-export type ProviderType = "gemini" | "openai" | "anthropic" | "replicate" | "fal" | "kie" | "wavespeed" | "muapi" | "higgsfield";
+export type ProviderType = "gemini" | "geminiAgent" | "openai" | "anthropic" | "replicate" | "fal" | "kie" | "wavespeed" | "muapi" | "higgsfield";
 
 // Model pricing info (stored when model is selected)
 export interface SelectedModelPricing {
@@ -51,6 +51,9 @@ export type LLMModelType =
   | "claude-haiku-4.5"
   | "kie-claude-opus-4.6"
   | "kie-claude-sonnet-4.6"
+  | "kie-claude-haiku-4.6"
+  | "kie-gemini-3.1-pro"
+  | "kie-gemini-3.5-flash"
   | "kie-gpt-5.4"
   | "kie-gpt-5.5";
 

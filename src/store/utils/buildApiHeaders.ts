@@ -12,6 +12,7 @@ import { ProviderType, ProviderSettings, LLMProvider } from "@/types";
  */
 const PROVIDER_HEADER_MAP: Record<ProviderType, string> = {
   gemini: "X-Gemini-API-Key",
+  geminiAgent: "X-Gemini-Agent-Key",
   replicate: "X-Replicate-API-Key",
   fal: "X-Fal-API-Key",
   kie: "X-Kie-Key",

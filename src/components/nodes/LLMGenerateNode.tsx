@@ -33,8 +33,11 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
   ],
   kie: [
+    { value: "kie-gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    { value: "kie-gemini-3.5-flash", label: "Gemini 3.5 Flash" },
     { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
     { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "kie-claude-haiku-4.6", label: "Claude Haiku 4.6" },
     { value: "kie-gpt-5.4", label: "GPT 5.4" },
     { value: "kie-gpt-5.5", label: "GPT 5.5" },
   ],

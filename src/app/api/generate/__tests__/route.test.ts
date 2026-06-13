@@ -12,14 +12,14 @@ const { mockGenerateContent, MockGoogleGenAI } = vi.hoisted(() => {
       generateContent: mockGenerateContent,
     };
 
-    constructor(config: { apiKey: string }) {
+    constructor(config: { apiKey: string; vertexai?: boolean }) {
       this.apiKey = config.apiKey;
       // Track calls to constructor
       MockGoogleGenAI.lastCalledWith = config;
       MockGoogleGenAI.callCount++;
     }
 
-    static lastCalledWith: { apiKey: string } | null = null;
+    static lastCalledWith: { apiKey: string; vertexai?: boolean } | null = null;
     static callCount = 0;
     static reset() {
       MockGoogleGenAI.lastCalledWith = null;
@@ -695,6 +695,89 @@ describe("/api/generate route", () => {
           ],
         })
       );
+    });
+  });
+
+  describe("Gemini Agent Platform provider", () => {
+    const agentSelectedModel = {
+      provider: "geminiAgent" as const,
+      modelId: "nano-banana-pro",
+      displayName: "Nano Banana Pro (Agent Platform)",
+    };
+
+    it("initializes the client in Vertex express mode with the Agent Platform key", async () => {
+      process.env.GEMINI_AGENT_API_KEY = "test-agent-key";
+      mockGenerateContent.mockResolvedValueOnce(createGeminiImageResponse());
+
+      const request = createMockPostRequest({
+        prompt: "A neon city skyline",
+        selectedModel: agentSelectedModel,
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.image).toBe("data:image/png;base64,base64ImageData");
+      // Constructed with vertexai:true + the Agent Platform key (express mode)
+      expect(MockGoogleGenAI.lastCalledWith).toEqual({ vertexai: true, apiKey: "test-agent-key" });
+      // Maps to the same underlying Gemini 3 Pro Image model
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gemini-3-pro-image-preview" })
+      );
+    });
+
+    it("prefers the X-Gemini-Agent-Key header over the env var", async () => {
+      process.env.GEMINI_AGENT_API_KEY = "env-agent-key";
+      mockGenerateContent.mockResolvedValueOnce(createGeminiImageResponse());
+
+      const request = createMockPostRequest(
+        { prompt: "A koi pond", selectedModel: agentSelectedModel },
+        { "X-Gemini-Agent-Key": "header-agent-key" }
+      );
+
+      await POST(request);
+
+      expect(MockGoogleGenAI.lastCalledWith).toEqual({ vertexai: true, apiKey: "header-agent-key" });
+    });
+
+    it("passes aspect_ratio and resolution from parameters into imageConfig", async () => {
+      process.env.GEMINI_AGENT_API_KEY = "test-agent-key";
+      mockGenerateContent.mockResolvedValueOnce(createGeminiImageResponse());
+
+      const request = createMockPostRequest({
+        prompt: "A portrait",
+        selectedModel: agentSelectedModel,
+        parameters: { aspect_ratio: "9:16", resolution: "4K" },
+      });
+
+      await POST(request);
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            imageConfig: { aspectRatio: "9:16", imageSize: "4K" },
+          }),
+        })
+      );
+    });
+
+    it("returns 401 when no Agent Platform key is configured", async () => {
+      delete process.env.GEMINI_AGENT_API_KEY;
+
+      const request = createMockPostRequest({
+        prompt: "A sunset",
+        selectedModel: agentSelectedModel,
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.success).toBe(false);
+      expect(data.error).toContain("Agent Platform API key not configured");
+      expect(MockGoogleGenAI.callCount).toBe(0);
     });
   });
 

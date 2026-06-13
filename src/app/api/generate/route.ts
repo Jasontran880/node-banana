@@ -656,6 +656,61 @@ export async function POST(request: NextRequest) {
       return buildMediaResponse(output);
     }
 
+    // Gemini Enterprise Agent Platform (Vertex express mode).
+    // Same generateContent request shape as the Developer API, but the client is
+    // initialized with vertexai:true so the Agent Platform API key authenticates
+    // against aiplatform.googleapis.com.
+    if (provider === "geminiAgent") {
+      if (!selectedModel?.modelId) {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "selectedModel with modelId is required for the Agent Platform" },
+          { status: 400 }
+        );
+      }
+
+      const agentApiKey = request.headers.get("X-Gemini-Agent-Key") || process.env.GEMINI_AGENT_API_KEY;
+      if (!agentApiKey) {
+        return NextResponse.json<GenerateResponse>(
+          {
+            success: false,
+            error: "Agent Platform API key not configured. Add GEMINI_AGENT_API_KEY to .env.local or configure in Settings.",
+          },
+          { status: 401 }
+        );
+      }
+
+      // Resolve prompt from top-level or dynamicInputs
+      let agentPrompt = prompt;
+      if (!agentPrompt && dynamicInputs?.prompt) {
+        agentPrompt = Array.isArray(dynamicInputs.prompt) ? dynamicInputs.prompt[0] : dynamicInputs.prompt;
+      }
+      if (agentPrompt !== undefined && agentPrompt !== null && typeof agentPrompt !== "string") {
+        return NextResponse.json<GenerateResponse>(
+          { success: false, error: "prompt must be a string" },
+          { status: 400 }
+        );
+      }
+
+      // Aspect ratio / resolution / search arrive via schema-driven parameters
+      // (this provider uses ModelParameters, not the native Gemini controls).
+      const agentAspectRatio = (parameters?.aspect_ratio as string | undefined) ?? aspectRatio;
+      const agentResolution = (parameters?.resolution as string | undefined) ?? resolution;
+      const agentGoogleSearch = (parameters?.use_google_search as boolean | undefined) ?? useGoogleSearch;
+
+      return await generateWithGemini(
+        requestId,
+        agentApiKey,
+        agentPrompt || "",
+        images || [],
+        selectedModel.modelId as ModelType,
+        agentAspectRatio,
+        agentResolution,
+        agentGoogleSearch,
+        false,
+        { vertexai: true }
+      );
+    }
+
     // Default: Use Gemini
     // User-provided key (from settings) takes precedence over env variable
     const geminiApiKey = request.headers.get("X-Gemini-API-Key") || process.env.GEMINI_API_KEY;

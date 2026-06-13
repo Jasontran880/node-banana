@@ -59,7 +59,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const generationsPath = useWorkflowStore((state) => state.generationsPath);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, higgsfieldApiKey, replicateEnabled, kieEnabled, higgsfieldEnabled } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, higgsfieldApiKey, geminiAgentApiKey, replicateEnabled, kieEnabled, higgsfieldEnabled, geminiAgentEnabled } = useProviderApiKeys();
   const [isLoadingCarouselImage, setIsLoadingCarouselImage] = useState(false);
   const [externalModels, setExternalModels] = useState<ProviderModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -105,8 +105,12 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     if (higgsfieldEnabled && higgsfieldApiKey) {
       providers.push({ id: "higgsfield", name: "Higgsfield" });
     }
+    // Add Gemini Agent Platform if configured
+    if (geminiAgentEnabled && geminiAgentApiKey) {
+      providers.push({ id: "geminiAgent", name: "Gemini Agent Platform" });
+    }
     return providers;
-  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, higgsfieldEnabled, higgsfieldApiKey]);
+  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, higgsfieldEnabled, higgsfieldApiKey, geminiAgentEnabled, geminiAgentApiKey]);
 
   // Migrate legacy data: derive selectedModel from model field if missing
   useEffect(() => {
@@ -146,6 +150,9 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       if (higgsfieldApiKey) {
         headers["X-Higgsfield-Key"] = higgsfieldApiKey;
       }
+      if (geminiAgentApiKey) {
+        headers["X-Gemini-Agent-Key"] = geminiAgentApiKey;
+      }
       const response = await deduplicatedFetch(`/api/models?provider=${currentProvider}&capabilities=${capabilities}`, { headers });
       if (response.ok) {
         const data = await response.json();
@@ -168,7 +175,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     } finally {
       setIsLoadingModels(false);
     }
-  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey, higgsfieldApiKey]);
+  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey, higgsfieldApiKey, geminiAgentApiKey]);
 
   useEffect(() => {
     fetchModels();

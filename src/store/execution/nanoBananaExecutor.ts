@@ -189,7 +189,10 @@ export async function executeNanoBanana(
         });
 
       // Track cost
-      if (nodeData.selectedModel?.provider === "fal" && nodeData.selectedModel?.pricing) {
+      if (
+        (nodeData.selectedModel?.provider === "fal" || nodeData.selectedModel?.provider === "geminiAgent") &&
+        nodeData.selectedModel?.pricing
+      ) {
         addIncurredCost(nodeData.selectedModel.pricing.amount);
       } else if (!nodeData.selectedModel || nodeData.selectedModel.provider === "gemini") {
         const generationCost = calculateGenerationCost(nodeData.model, nodeData.resolution);

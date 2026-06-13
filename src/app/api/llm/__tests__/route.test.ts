@@ -869,4 +869,143 @@ describe("/api/llm route", () => {
       );
     });
   });
+
+  describe("Kie provider", () => {
+    beforeEach(() => {
+      global.fetch = mockFetch;
+    });
+
+    it("should generate text with Kie Gemini 3.1 Pro", async () => {
+      process.env.KIE_API_KEY = "test-kie-key";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(JSON.stringify({
+            choices: [{ message: { content: "Gemini response from Kie" } }],
+          })),
+      });
+
+      const request = createMockPostRequest({
+        prompt: "Describe this image",
+        images: ["data:image/png;base64,iVBORw0KGgo="],
+        provider: "kie",
+        model: "kie-gemini-3.1-pro",
+        temperature: 0.4,
+        maxTokens: 2048,
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.text).toBe("Gemini response from Kie");
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.kie.ai/gemini-3.1-pro/v1/chat/completions",
+        expect.objectContaining({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-kie-key",
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Describe this image" },
+                  { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } },
+                ],
+              },
+            ],
+            stream: false,
+            temperature: 0.4,
+            max_tokens: 2048,
+          }),
+        })
+      );
+    });
+
+    it("should generate text with Kie Gemini 3.5 Flash candidate response format", async () => {
+      process.env.KIE_API_KEY = "test-kie-key";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(JSON.stringify({
+            candidates: [{ content: { parts: [{ text: "Flash response from Kie" }] } }],
+          })),
+      });
+
+      const request = createMockPostRequest({
+        prompt: "Test prompt",
+        provider: "kie",
+        model: "kie-gemini-3.5-flash",
+        temperature: 0.7,
+        maxTokens: 1024,
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.text).toBe("Flash response from Kie");
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.kie.ai/gemini-3-5-flash-openai/v1/chat/completions",
+        expect.objectContaining({
+          body: JSON.stringify({
+            messages: [{ role: "user", content: "Test prompt" }],
+            stream: false,
+            temperature: 0.7,
+            max_tokens: 1024,
+          }),
+        })
+      );
+    });
+
+    it("should generate text with Kie Claude Haiku 4.6", async () => {
+      process.env.KIE_API_KEY = "test-kie-key";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(JSON.stringify({
+            content: [{ type: "text", text: "Haiku response from Kie" }],
+          })),
+      });
+
+      const request = createMockPostRequest({
+        prompt: "Test prompt",
+        provider: "kie",
+        model: "kie-claude-haiku-4.6",
+        temperature: 0.7,
+        maxTokens: 1024,
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.text).toBe("Haiku response from Kie");
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.kie.ai/claude/v1/messages",
+        expect.objectContaining({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-kie-key",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-6",
+            messages: [{ role: "user", content: [{ type: "text", text: "Test prompt" }] }],
+            stream: false,
+            max_tokens: 1024,
+          }),
+        })
+      );
+    });
+  });
 });

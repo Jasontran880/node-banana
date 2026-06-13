@@ -1022,6 +1022,29 @@ function getKieSchema(modelId: string): ExtractedSchema {
 }
 
 /**
+ * Get hardcoded schema for Gemini Agent Platform models.
+ * Parameter names (aspect_ratio, resolution, use_google_search) match the keys
+ * read by the geminiAgent branch in the generate route.
+ */
+function getGeminiAgentSchema(modelId: string): ExtractedSchema {
+  const schemas: Record<string, ExtractedSchema> = {
+    "nano-banana-pro": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"], default: "auto" },
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["1K", "2K", "4K"], default: "2K" },
+        { name: "use_google_search", type: "boolean", description: "Enable Google Search grounding for real-world facts and up-to-date information", default: false },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "image_input", type: "image", required: false, label: "Image", isArray: true },
+      ],
+    },
+  };
+
+  return schemas[modelId] || { parameters: [], inputs: [{ name: "prompt", type: "text", required: true, label: "Prompt" }] };
+}
+
+/**
  * Get schema for Gemini video models (native Veo via Gemini API)
  * Returns null if the model is not a Gemini video model.
  */
@@ -1300,11 +1323,11 @@ export async function GET(
   const decodedModelId = decodeURIComponent(modelId);
   const provider = request.nextUrl.searchParams.get("provider") as ProviderType | null;
 
-  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini" && provider !== "muapi" && provider !== "higgsfield")) {
+  if (!provider || (provider !== "replicate" && provider !== "fal" && provider !== "kie" && provider !== "wavespeed" && provider !== "gemini" && provider !== "geminiAgent" && provider !== "muapi" && provider !== "higgsfield")) {
     return NextResponse.json<SchemaErrorResponse>(
       {
         success: false,
-        error: "Invalid or missing provider. Use ?provider=replicate, ?provider=fal, ?provider=kie, ?provider=wavespeed, ?provider=gemini, or ?provider=higgsfield",
+        error: "Invalid or missing provider. Use ?provider=replicate, ?provider=fal, ?provider=kie, ?provider=wavespeed, ?provider=gemini, ?provider=geminiAgent, or ?provider=higgsfield",
       },
       { status: 400 }
     );
@@ -1347,6 +1370,9 @@ export async function GET(
         );
       }
       result = await fetchReplicateSchema(decodedModelId, apiKey);
+    } else if (provider === "geminiAgent") {
+      // Agent Platform uses hardcoded schemas (no schema discovery API)
+      result = getGeminiAgentSchema(decodedModelId);
     } else if (provider === "muapi") {
       // mu-api uses hardcoded schemas (no schema discovery API)
       result = getMuapiSchema(decodedModelId);

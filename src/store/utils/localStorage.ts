@@ -44,6 +44,7 @@ const DEFAULT_GENERATE_IMAGE_SETTINGS: GenerateImageDefaults = {
 export const defaultProviderSettings: ProviderSettings = {
   providers: {
     gemini: { id: "gemini", name: "Google Gemini", enabled: true, apiKey: null, apiKeyEnvVar: "GEMINI_API_KEY" },
+    geminiAgent: { id: "geminiAgent", name: "Gemini Agent Platform", enabled: false, apiKey: null, apiKeyEnvVar: "GEMINI_AGENT_API_KEY" },
     openai: { id: "openai", name: "OpenAI", enabled: true, apiKey: null, apiKeyEnvVar: "OPENAI_API_KEY" },
     anthropic: { id: "anthropic", name: "Anthropic", enabled: true, apiKey: null, apiKeyEnvVar: "ANTHROPIC_API_KEY" },
     replicate: { id: "replicate", name: "Replicate", enabled: false, apiKey: null, apiKeyEnvVar: "REPLICATE_API_KEY" },
