@@ -302,7 +302,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_two_image_renders_of_674750278661fc6ce7671b9c12f1d860",
         "inputImageRefs": [
           "img-mpg3yl79-5tdclw",
@@ -313,7 +313,7 @@
       },
       "style": {
         "width": 200,
-        "height": 302.328125
+        "height": 301.53125
       },
       "measured": {
         "width": 200,
@@ -321,7 +321,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 302.328125,
+      "height": 301.53125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -458,7 +458,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_two_image_renders_of_e2f29b2efa0654547c97535ca8fe524d",
         "inputImageRefs": [
           "img-mpg3yl79-5tdclw",
@@ -469,7 +469,7 @@
       },
       "style": {
         "width": 200,
-        "height": 302.328125
+        "height": 301.53125
       },
       "measured": {
         "width": 200,
@@ -477,7 +477,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 302.328125,
+      "height": 301.53125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -607,7 +607,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_two_image_renders_of_3602e0439799feb95160137eba084633",
         "inputImageRefs": [
           "img-mpg3yl79-5tdclw",
@@ -618,7 +618,7 @@
       },
       "style": {
         "width": 200,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 200,
@@ -626,7 +626,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -841,19 +841,19 @@
         "error": null,
         "imageHistory": [],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375
+        "_settingsPanelHeight": 142.1875
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-5"
@@ -1011,11 +1011,11 @@
         "error": null,
         "imageHistory": [],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375
+        "_settingsPanelHeight": 142.1875
       },
       "style": {
         "width": 300,
-        "height": 302.328125
+        "height": 301.53125
       },
       "measured": {
         "width": 300,
@@ -1023,7 +1023,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 302.328125,
+      "height": 301.53125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -1148,7 +1148,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "critical_requirement_ensure_t_a3277fbb51f0ee5d8c5cbdc2f2fbe52f",
         "inputImageRefs": [
@@ -1157,15 +1157,15 @@
       },
       "style": {
         "width": 300,
-        "height": 300.859375
+        "height": 300.0625
       },
       "measured": {
         "width": 300,
-        "height": 301
+        "height": 300
       },
       "className": "",
       "width": 300,
-      "height": 300.859375,
+      "height": 300.0625,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -1240,14 +1240,14 @@
         "maxTokens": 8192,
         "status": "complete",
         "error": null,
-        "_settingsPanelHeight": 149.6875,
+        "_settingsPanelHeight": 149.140625,
         "inputImageRefs": [
           "img-mpg3ylru-0bbinx"
         ]
       },
       "style": {
         "width": 314,
-        "height": 438.09375
+        "height": 437.546875
       },
       "measured": {
         "width": 314,
@@ -1255,7 +1255,7 @@
       },
       "className": "",
       "width": 314,
-      "height": 438.09375,
+      "height": 437.546875,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -1325,7 +1325,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_fd99eb43c2809bf76d60821fa9174215",
         "inputImageRefs": [
           "img-mpg3ylru-0bbinx",
@@ -1334,15 +1334,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-4",
@@ -1365,7 +1365,7 @@
         "maxTokens": 8192,
         "status": "complete",
         "error": null,
-        "_settingsPanelHeight": 149.6875,
+        "_settingsPanelHeight": 149.140625,
         "parametersExpanded": true,
         "inputImageRefs": [
           "img-mpg3ylsz-3en480",
@@ -1376,7 +1376,7 @@
       },
       "style": {
         "width": 240,
-        "height": 312.09375
+        "height": 311.546875
       },
       "measured": {
         "width": 240,
@@ -1384,7 +1384,7 @@
       },
       "className": "",
       "width": 240,
-      "height": 312.09375,
+      "height": 311.546875,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -1648,7 +1648,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_two_image_renders_of_293b7a30a582856ec6429a92256b4498",
         "inputImageRefs": [
           "img-mpg3yl79-5tdclw",
@@ -1659,7 +1659,7 @@
       },
       "style": {
         "width": 200,
-        "height": 303.40625
+        "height": 302.609375
       },
       "measured": {
         "width": 200,
@@ -1667,7 +1667,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 303.40625,
+      "height": 302.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -1804,7 +1804,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_two_image_renders_of_ffdfcbbaa2f7aacb562bb7b8de4bdb48",
         "inputImageRefs": [
           "img-mpg3yl79-5tdclw",
@@ -1815,7 +1815,7 @@
       },
       "style": {
         "width": 200,
-        "height": 302.328125
+        "height": 301.53125
       },
       "measured": {
         "width": 200,
@@ -1823,7 +1823,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 302.328125,
+      "height": 301.53125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -1934,7 +1934,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "using_the_images_and_the_follo_ec948e15f6a21740fa63b474e1a2682e",
         "inputImageRefs": [
@@ -1944,15 +1944,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-6",
@@ -2033,7 +2033,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_3_the_most_visual_and_7b123495d32e99f05ba19a1bbe387efc",
         "inputImageRefs": [
           "img-mpg3ylfc-k2tx8h",
@@ -2042,7 +2042,7 @@
       },
       "style": {
         "width": 200,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 200,
@@ -2050,7 +2050,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -2103,7 +2103,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_3_the_most_visual_and_f82b7cdce896771e5730cc59b68d9214",
         "inputImageRefs": [
           "img-mpg3ylfc-k2tx8h",
@@ -2112,7 +2112,7 @@
       },
       "style": {
         "width": 200,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 200,
@@ -2120,7 +2120,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -2173,7 +2173,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_3_the_most_visual_and_2eb33fe0ac71fc900d013dd9ef90fd4d",
         "inputImageRefs": [
           "img-mpg3ylfc-k2tx8h",
@@ -2182,7 +2182,7 @@
       },
       "style": {
         "width": 200,
-        "height": 302.34375
+        "height": 301.546875
       },
       "measured": {
         "width": 200,
@@ -2190,7 +2190,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 302.34375,
+      "height": 301.546875,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -2243,7 +2243,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_e2fc4c96248c695b030a5ae953e485c6",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -2251,7 +2251,7 @@
       },
       "style": {
         "width": 200,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 200,
@@ -2259,7 +2259,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -2305,7 +2305,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "1775949206137",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -2313,7 +2313,7 @@
       },
       "style": {
         "width": 200,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 200,
@@ -2321,7 +2321,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -2367,7 +2367,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "1775949206137",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -2375,7 +2375,7 @@
       },
       "style": {
         "width": 200,
-        "height": 302.328125
+        "height": 301.53125
       },
       "measured": {
         "width": 200,
@@ -2383,7 +2383,7 @@
       },
       "className": "",
       "width": 200,
-      "height": 302.328125,
+      "height": 301.53125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -2457,7 +2457,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "using_the_following_json_promp_364fa57ab31e1f6f59b393bc73e7df98",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -2465,11 +2465,11 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "selected": false,
@@ -2477,7 +2477,7 @@
       "dragging": false,
       "groupId": "group-15",
       "width": 313,
-      "height": 320
+      "height": 319.203125
     },
     {
       "id": "nanoBanana-161",
@@ -2512,7 +2512,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_b8269db317595f417f5f1be6c78a171f",
         "inputImageRefs": [
           "img-mpg3ylru-0bbinx",
@@ -2521,15 +2521,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-4",
@@ -2575,7 +2575,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_602ee7d6befdd5c7de073231b13ccea3",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -2583,15 +2583,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -2630,7 +2630,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "task_generate_a_premium_298744296b414bc7db18dee066fa709b",
         "inputImageRefs": [
@@ -2640,15 +2640,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-6",
@@ -2757,11 +2757,11 @@
         "error": null,
         "imageHistory": [],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375
+        "_settingsPanelHeight": 142.1875
       },
       "style": {
         "width": 300,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 300,
@@ -2769,7 +2769,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -2808,7 +2808,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "critical_requirement_must_ref_fa418907b9b66052afd0351b31920cf2",
         "inputImageRefs": [
           "img-mpg3ylkv-9582x2",
@@ -2817,7 +2817,7 @@
       },
       "style": {
         "width": 300,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 300,
@@ -2825,7 +2825,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false
@@ -2863,7 +2863,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "critical_requirement_must_ref_2323596bbedc91d7ff49c52c8b8697f1",
         "inputImageRefs": [
@@ -2873,7 +2873,7 @@
       },
       "style": {
         "width": 300,
-        "height": 301.484375
+        "height": 300.6875
       },
       "measured": {
         "width": 300,
@@ -2881,7 +2881,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 301.484375,
+      "height": 300.6875,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -2927,7 +2927,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -2935,7 +2935,7 @@
       },
       "style": {
         "width": 300,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 300,
@@ -2943,7 +2943,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -2982,7 +2982,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "critical_requirement_ensure_t_10c24ec21dfb9de58437c42e95b7d09c",
         "inputImageRefs": [
@@ -2991,7 +2991,7 @@
       },
       "style": {
         "width": 300,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 300,
@@ -2999,7 +2999,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -3030,7 +3030,7 @@
         "error": "exception TypeError: fetch failed sending request",
         "imageHistory": [],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3038,7 +3038,7 @@
       },
       "style": {
         "width": 300,
-        "height": 300.40625
+        "height": 299.609375
       },
       "measured": {
         "width": 300,
@@ -3046,7 +3046,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 300.40625,
+      "height": 299.609375,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -3092,7 +3092,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_541bf1878703c3a74b3cbe390e36105f",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3100,15 +3100,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -3154,7 +3154,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_3ff878602eef0a6735d29d23bc7515ee",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3162,15 +3162,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -3209,7 +3209,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_9e13c7d16bd9e939d7489d1d69bc2cf6",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3217,15 +3217,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -3264,7 +3264,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "using_the_images_and_the_follo_075f65a080ce6e12850a22cf0ab7d7bd",
         "inputImageRefs": [
@@ -3274,15 +3274,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-6",
@@ -3342,7 +3342,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "using_the_following_json_promp_4b951e4dc54923ab3ff312c7f7c8ea43",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3350,11 +3350,11 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "selected": false,
@@ -3362,7 +3362,7 @@
       "dragging": false,
       "groupId": "group-15",
       "width": 313,
-      "height": 320
+      "height": 319.203125
     },
     {
       "id": "nanoBanana-184",
@@ -3418,7 +3418,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "using_the_following_json_promp_574189e5307b02f7bd11edfec2fdb0c8",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3426,11 +3426,11 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "selected": false,
@@ -3438,7 +3438,7 @@
       "dragging": false,
       "groupId": "group-15",
       "width": 313,
-      "height": 320
+      "height": 319.203125
     },
     {
       "id": "nanoBanana-185",
@@ -3494,7 +3494,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "using_the_following_json_promp_19bacab1ab2e4a77d39f13ab4fe3aa06",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3502,11 +3502,11 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "selected": false,
@@ -3514,7 +3514,7 @@
       "dragging": false,
       "groupId": "group-15",
       "width": 313,
-      "height": 320
+      "height": 319.203125
     },
     {
       "id": "nanoBanana-186",
@@ -3633,7 +3633,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_two_image_renders_of_8da338e9d4aace71d1b2f2269613160f",
         "inputImageRefs": [
           "img-mpg3yl79-5tdclw",
@@ -3644,15 +3644,15 @@
       },
       "style": {
         "width": 200,
-        "height": 300.828125
+        "height": 300.03125
       },
       "measured": {
         "width": 200,
-        "height": 301
+        "height": 300
       },
       "className": "",
       "width": 200,
-      "height": 300.828125,
+      "height": 300.03125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -3698,7 +3698,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "take_the_3_the_most_visual_and_39f610abe838fa2892de333c8e8cd679",
         "inputImageRefs": [
           "img-mpg3ylfc-k2tx8h",
@@ -3707,15 +3707,15 @@
       },
       "style": {
         "width": 200,
-        "height": 300.828125
+        "height": 300.03125
       },
       "measured": {
         "width": 200,
-        "height": 301
+        "height": 300
       },
       "className": "",
       "width": 200,
-      "height": 300.828125,
+      "height": 300.03125,
       "selected": false,
       "resizing": false,
       "dragging": false,
@@ -3768,7 +3768,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_e2fc4c96248c695b030a5ae953e485c6",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3776,15 +3776,15 @@
       },
       "style": {
         "width": 200,
-        "height": 300.828125
+        "height": 300.03125
       },
       "measured": {
         "width": 200,
-        "height": 301
+        "height": 300
       },
       "className": "",
       "width": 200,
-      "height": 300.828125,
+      "height": 300.03125,
       "selected": false,
       "dragging": false,
       "resizing": false,
@@ -3882,22 +3882,22 @@
         "maxTokens": 8192,
         "status": "complete",
         "error": null,
-        "_settingsPanelHeight": 149.6875,
+        "_settingsPanelHeight": 149.140625,
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
         ]
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.453125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.453125,
       "selected": false,
       "dragging": false,
       "groupId": "group-20"
@@ -3949,7 +3949,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "json_creative_brief_019537d67bc1a50942798bf34b51c0a2",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -3957,15 +3957,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-20"
@@ -4010,7 +4010,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "json_creative_brief_d1cd7d0e63fd8b057edbd41663d6bbf8",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -4018,15 +4018,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-20"
@@ -4064,7 +4064,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "json_prompt_a_clean_8c2fd9048065661add6631df903f4cad",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -4072,15 +4072,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-20"
@@ -4132,7 +4132,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "json_creative_brief_c8122707cdd6fbf4ee44bb04ff76527c",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -4140,15 +4140,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false
     },
@@ -4177,7 +4177,7 @@
         "error": "exception TypeError: fetch failed sending request",
         "imageHistory": [],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "inputImageRefs": [
           "img-mpg3ylru-0bbinx",
           "img-mpg3ylpv-6hbcoy"
@@ -4185,15 +4185,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-4",
@@ -4232,7 +4232,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "use_the_following_json_prompt_168170ad0bd9736b6670f2cb18881936",
         "inputImageRefs": [
           "img-mpg3ylru-0bbinx",
@@ -4241,15 +4241,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-4",
@@ -4288,7 +4288,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "parametersExpanded": true,
         "outputImageRef": "using_the_images_and_the_follo_54e545ad397f405fcff4b9de76ba4e85",
         "inputImageRefs": [
@@ -4298,15 +4298,15 @@
       },
       "style": {
         "width": 313,
-        "height": 320
+        "height": 319.203125
       },
       "measured": {
         "width": 313,
-        "height": 320
+        "height": 319
       },
       "className": "",
       "width": 313,
-      "height": 320,
+      "height": 319.203125,
       "selected": false,
       "dragging": false,
       "groupId": "group-6",
@@ -4329,19 +4329,19 @@
         "maxTokens": 8192,
         "status": "complete",
         "error": null,
-        "_settingsPanelHeight": 149.6875
+        "_settingsPanelHeight": 149.140625
       },
       "style": {
         "width": 320,
-        "height": 509.6875
+        "height": 509.140625
       },
       "measured": {
         "width": 320,
-        "height": 510
+        "height": 509
       },
       "className": "",
       "width": 320,
-      "height": 509.6875,
+      "height": 509.140625,
       "selected": false,
       "groupId": "group-12"
     },
@@ -4349,8 +4349,8 @@
       "id": "nanoBanana-213",
       "type": "nanoBanana",
       "position": {
-        "x": 4519.33179481376,
-        "y": 1958.7926548363753
+        "x": 4531.404584399615,
+        "y": 1941.890749416178
       },
       "data": {
         "inputImages": [],
@@ -4378,7 +4378,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "aspect_ratio_970_600_9981b7c47f927a6c9ca8a6726fae84ff",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -4386,16 +4386,16 @@
       },
       "style": {
         "width": 300,
-        "height": 442.984375
+        "height": 442.1875
       },
       "measured": {
         "width": 300,
-        "height": 443
+        "height": 442
       },
       "className": "",
       "width": 300,
-      "height": 442.984375,
-      "selected": false,
+      "height": 442.1875,
+      "selected": true,
       "dragging": false,
       "groupId": "group-12"
     },
@@ -4432,7 +4432,7 @@
           }
         ],
         "selectedHistoryIndex": 0,
-        "_settingsPanelHeight": 142.984375,
+        "_settingsPanelHeight": 142.1875,
         "outputImageRef": "aspect_ratio_970_600_e4344ece1912a31a0c7fb704021e4ccc",
         "inputImageRefs": [
           "img-mpg3ylpv-6hbcoy"
@@ -4440,7 +4440,7 @@
       },
       "style": {
         "width": 300,
-        "height": 298.4375
+        "height": 297.640625
       },
       "measured": {
         "width": 300,
@@ -4448,7 +4448,7 @@
       },
       "className": "",
       "width": 300,
-      "height": 298.4375,
+      "height": 297.640625,
       "selected": false,
       "dragging": false,
       "groupId": "group-12"

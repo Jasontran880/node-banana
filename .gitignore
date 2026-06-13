@@ -7,11 +7,14 @@
 # testing
 /coverage
 
-# project metadata is commit-worthy; generated media is not
+# Within each project, commit metadata (.json) plus the inputs/ and outputs/
+# folders. Everything else — generated media (generations/), archives, and any
+# loose scratch files — stays out of the commit.
 /projects/**
 !/projects/**/
-!/projects/*.json
 !/projects/**/*.json
+!/projects/**/inputs/**
+!/projects/**/outputs/**
 
 # next.js
 /.next/
