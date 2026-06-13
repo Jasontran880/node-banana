@@ -5,11 +5,347 @@
  * Supports standard createTask endpoint and Veo-specific endpoints.
  */
 
+import { createHash } from "crypto";
 import { GenerationInput, GenerationOutput } from "@/lib/providers/types";
 import { validateMediaUrl } from "@/utils/urlValidation";
 
 const MAX_MEDIA_SIZE = 500 * 1024 * 1024; // 500MB
 const MAX_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
+const KIE_UPLOAD_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const DEFAULT_KIE_UPLOAD_CONCURRENCY = 6;
+const DEFAULT_KIE_SUBMIT_LIMIT = 20;
+const DEFAULT_KIE_SUBMIT_WINDOW_MS = 10_000;
+const DEFAULT_KIE_FETCH_MAX_ATTEMPTS = 3;
+const DEFAULT_KIE_RETRY_BASE_DELAY_MS = 500;
+const DEFAULT_KIE_UPLOAD_TIMEOUT_MS = 180_000;
+const DEFAULT_KIE_REQUEST_TIMEOUT_MS = 90_000;
+const DEFAULT_KIE_POLL_TIMEOUT_MS = 30_000;
+const DEFAULT_KIE_OUTPUT_TIMEOUT_MS = 120_000;
+
+const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+const RETRYABLE_ERROR_CODES = new Set([
+  "ABORT_ERR",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EPIPE",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
+
+type ConcurrencyLimiter = {
+  <T>(fn: () => Promise<T>): Promise<T>;
+  reset: () => void;
+};
+
+type RateLimiter = {
+  wait: () => Promise<void>;
+  reset: () => void;
+};
+
+type KieUploadCacheEntry = {
+  url: string;
+  expiresAt: number;
+};
+
+type KieFetchOptions = {
+  requestId: string;
+  operation: string;
+  timeoutMs?: number;
+  maxAttempts?: number;
+  /**
+   * When false, the request is treated as non-idempotent and is attempted
+   * exactly once — never retried. Required for task-creation POSTs
+   * (createTask / Veo generate / Veo extend): each submission the server
+   * accepts starts and bills a new generation, so retrying after a 429,
+   * 5xx, or timeout (where Kie may already have accepted the first task)
+   * produces a duplicate generation — the image generates then immediately
+   * regenerates.
+   */
+  idempotent?: boolean;
+};
+
+function readIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createConcurrencyLimiter(maxConcurrent: number): ConcurrencyLimiter {
+  let active = 0;
+  const queue: Array<() => void> = [];
+
+  const runNext = () => {
+    const next = queue.shift();
+    if (next) next();
+  };
+
+  const limit = <T>(fn: () => Promise<T>): Promise<T> => new Promise((resolve, reject) => {
+    const run = () => {
+      active++;
+      fn()
+        .then(resolve, reject)
+        .finally(() => {
+          active--;
+          runNext();
+        });
+    };
+
+    if (active < maxConcurrent) {
+      run();
+    } else {
+      queue.push(run);
+    }
+  });
+
+  limit.reset = () => {
+    active = 0;
+    queue.splice(0, queue.length);
+  };
+
+  return limit;
+}
+
+function createRateLimiter(limit: number, windowMs: number): RateLimiter {
+  let timestamps: number[] = [];
+  let chain = Promise.resolve();
+
+  const reserveSlot = async (): Promise<void> => {
+    const now = Date.now();
+    timestamps = timestamps.filter((timestamp) => now - timestamp < windowMs);
+
+    if (timestamps.length >= limit) {
+      const oldestTimestamp = timestamps[0];
+      const waitMs = Math.max(0, windowMs - (now - oldestTimestamp) + 25);
+      await sleep(waitMs);
+      return reserveSlot();
+    }
+
+    timestamps.push(Date.now());
+  };
+
+  return {
+    wait: async () => {
+      const previous = chain;
+      let release: () => void = () => {};
+      chain = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      await previous;
+      try {
+        await reserveSlot();
+      } finally {
+        release();
+      }
+    },
+    reset: () => {
+      timestamps = [];
+      chain = Promise.resolve();
+    },
+  };
+}
+
+const kieUploadLimiter = createConcurrencyLimiter(
+  readIntEnv("KIE_UPLOAD_CONCURRENCY", DEFAULT_KIE_UPLOAD_CONCURRENCY, 1, 30)
+);
+const kieSubmitRateLimiter = createRateLimiter(
+  readIntEnv("KIE_SUBMIT_LIMIT", DEFAULT_KIE_SUBMIT_LIMIT, 1, 100),
+  readIntEnv("KIE_SUBMIT_WINDOW_MS", DEFAULT_KIE_SUBMIT_WINDOW_MS, 100, 60_000)
+);
+
+const kieImageUploadCache = new Map<string, KieUploadCacheEntry>();
+const pendingKieImageUploads = new Map<string, Promise<string>>();
+
+function getKieFetchMaxAttempts(): number {
+  return readIntEnv("KIE_FETCH_MAX_ATTEMPTS", DEFAULT_KIE_FETCH_MAX_ATTEMPTS, 1, 5);
+}
+
+function getKieRetryBaseDelayMs(): number {
+  return readIntEnv("KIE_RETRY_BASE_DELAY_MS", DEFAULT_KIE_RETRY_BASE_DELAY_MS, 0, 30_000);
+}
+
+function getKieUploadTimeoutMs(): number {
+  return readIntEnv("KIE_UPLOAD_TIMEOUT_MS", DEFAULT_KIE_UPLOAD_TIMEOUT_MS, 1_000, 10 * 60_000);
+}
+
+function getKieRequestTimeoutMs(): number {
+  return readIntEnv("KIE_REQUEST_TIMEOUT_MS", DEFAULT_KIE_REQUEST_TIMEOUT_MS, 1_000, 10 * 60_000);
+}
+
+function getKiePollTimeoutMs(): number {
+  return readIntEnv("KIE_POLL_TIMEOUT_MS", DEFAULT_KIE_POLL_TIMEOUT_MS, 1_000, 120_000);
+}
+
+function getKieOutputTimeoutMs(): number {
+  return readIntEnv("KIE_OUTPUT_TIMEOUT_MS", DEFAULT_KIE_OUTPUT_TIMEOUT_MS, 1_000, 10 * 60_000);
+}
+
+function getRetryAfterMs(response: Response): number | null {
+  const retryAfter = response.headers.get("retry-after");
+  if (!retryAfter) return null;
+
+  const seconds = Number.parseFloat(retryAfter);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+
+  const date = Date.parse(retryAfter);
+  if (Number.isFinite(date)) {
+    return Math.max(0, date - Date.now());
+  }
+
+  return null;
+}
+
+function getRetryDelayMs(attempt: number, response?: Response): number {
+  const retryAfterMs = response ? getRetryAfterMs(response) : null;
+  if (retryAfterMs !== null) return Math.min(retryAfterMs, 30_000);
+
+  const baseDelayMs = getKieRetryBaseDelayMs();
+  const jitterMs = Math.floor(Math.random() * Math.max(baseDelayMs, 1));
+  return Math.min(baseDelayMs * 2 ** (attempt - 1) + jitterMs, 30_000);
+}
+
+function getErrorCauseDetails(error: unknown): string | null {
+  if (!error || typeof error !== "object" || !("cause" in error)) return null;
+
+  const cause = (error as { cause?: unknown }).cause;
+  if (!cause || typeof cause !== "object") return null;
+
+  const detail: Record<string, unknown> = {};
+  for (const key of ["name", "code", "message"] as const) {
+    const value = (cause as Record<string, unknown>)[key];
+    if (typeof value === "string") detail[key] = value;
+  }
+
+  return Object.keys(detail).length > 0 ? JSON.stringify(detail) : null;
+}
+
+function getErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+
+  const directCode = (error as Record<string, unknown>).code;
+  if (typeof directCode === "string") return directCode;
+
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause && typeof cause === "object") {
+    const causeCode = (cause as Record<string, unknown>).code;
+    if (typeof causeCode === "string") return causeCode;
+  }
+
+  return null;
+}
+
+function formatFetchError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const causeDetails = getErrorCauseDetails(error);
+  return causeDetails ? `${message} (${causeDetails})` : message;
+}
+
+function isRetryableFetchError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  if (error instanceof TypeError && error.message === "fetch failed") return true;
+
+  const errorCode = getErrorCode(error);
+  return errorCode ? RETRYABLE_ERROR_CODES.has(errorCode) : false;
+}
+
+async function fetchKieWithRetry(
+  url: string,
+  init: RequestInit,
+  options: KieFetchOptions
+): Promise<Response> {
+  // Non-idempotent requests (task submissions) must run exactly once. With
+  // maxAttempts === 1 the loop below never retries: a retryable status falls
+  // through to `return response` (since `attempt < maxAttempts` is false) and
+  // a thrown error breaks out (since `attempt >= maxAttempts`).
+  const maxAttempts = options.idempotent === false
+    ? 1
+    : (options.maxAttempts ?? getKieFetchMaxAttempts());
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = options.timeoutMs
+      ? setTimeout(() => controller.abort(), options.timeoutMs)
+      : null;
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: init.signal ?? controller.signal,
+      });
+
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < maxAttempts) {
+        console.warn(`[API:${options.requestId}] ${options.operation} returned ${response.status}; retrying attempt ${attempt + 1}/${maxAttempts}`);
+        await response.text().catch(() => undefined);
+        await sleep(getRetryDelayMs(attempt, response));
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+      lastError = error;
+
+      if (!isRetryableFetchError(error) || attempt >= maxAttempts) {
+        break;
+      }
+
+      console.warn(`[API:${options.requestId}] ${options.operation} failed (${formatFetchError(error)}); retrying attempt ${attempt + 1}/${maxAttempts}`);
+      await sleep(getRetryDelayMs(attempt));
+    }
+  }
+
+  throw new Error(`${options.operation} failed after ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"}: ${formatFetchError(lastError)}`);
+}
+
+async function waitForKieSubmissionSlot(requestId: string, operation: string): Promise<void> {
+  const startedAt = Date.now();
+  await kieSubmitRateLimiter.wait();
+  const waitMs = Date.now() - startedAt;
+  if (waitMs > 100) {
+    console.log(`[API:${requestId}] ${operation} waited ${waitMs}ms for Kie.ai submission rate limit`);
+  }
+}
+
+function getImageUploadCacheKey(mimeType: string, imageData: string): string {
+  return createHash("sha256")
+    .update(mimeType)
+    .update("\0")
+    .update(imageData)
+    .digest("hex");
+}
+
+function getCachedKieImageUpload(cacheKey: string): string | null {
+  const cached = kieImageUploadCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    kieImageUploadCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.url;
+}
+
+export function __resetKieProviderStateForTests(): void {
+  kieUploadLimiter.reset();
+  kieSubmitRateLimiter.reset();
+  kieImageUploadCache.clear();
+  pendingKieImageUploads.clear();
+}
 
 /**
  * Get default required parameters for a Kie model
@@ -259,23 +595,31 @@ export async function uploadVideoToKie(
 
   const binaryData = Buffer.from(videoData, "base64");
   const ext = mimeType.includes("webm") ? "webm" : mimeType.includes("mov") ? "mov" : "mp4";
-  const filename = `upload_${Date.now()}.${ext}`;
+  const filename = `upload_${Date.now()}_${requestId}.${ext}`;
   const dataUrl = `data:${mimeType};base64,${videoData}`;
 
   console.log(`[API:${requestId}] Uploading video to Kie.ai: ${filename} (${(binaryData.length / (1024 * 1024)).toFixed(1)}MB)`);
 
-  const response = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await kieUploadLimiter(() => fetchKieWithRetry(
+    "https://kieai.redpandaai.co/api/file-base64-upload",
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        base64Data: dataUrl,
+        uploadPath: "videos",
+        fileName: filename,
+      }),
     },
-    body: JSON.stringify({
-      base64Data: dataUrl,
-      uploadPath: "videos",
-      fileName: filename,
-    }),
-  });
+    {
+      requestId,
+      operation: "Kie.ai video upload",
+      timeoutMs: getKieUploadTimeoutMs(),
+    }
+  ));
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -332,50 +676,82 @@ export async function uploadImageToKie(
   const mimeType = detected.mimeType;
   const ext = detected.ext;
 
-  const filename = `upload_${Date.now()}.${ext}`;
+  const cacheKey = getImageUploadCacheKey(mimeType, imageData);
+  const cachedUrl = getCachedKieImageUpload(cacheKey);
+  if (cachedUrl) {
+    console.log(`[API:${requestId}] Reusing cached Kie image upload: ${cachedUrl.substring(0, 80)}...`);
+    return cachedUrl;
+  }
 
+  const pendingUpload = pendingKieImageUploads.get(cacheKey);
+  if (pendingUpload) {
+    console.log(`[API:${requestId}] Waiting for in-flight Kie image upload for identical image`);
+    return pendingUpload;
+  }
+
+  const filename = `upload_${Date.now()}_${requestId}.${ext}`;
   console.log(`[API:${requestId}] Uploading image to Kie.ai: ${filename} (${(binaryData.length / 1024).toFixed(1)}KB) [declared: ${declaredMimeType}, actual: ${mimeType}]`);
 
   // Use base64 upload endpoint (same as official Kie client)
   // Format: data:{mime_type};base64,{data}
   const dataUrl = `data:${mimeType};base64,${imageData}`;
 
-  const response = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      base64Data: dataUrl,
-      uploadPath: "images",
-      fileName: filename,
-    }),
+  const uploadPromise = kieUploadLimiter(async () => {
+    const response = await fetchKieWithRetry(
+      "https://kieai.redpandaai.co/api/file-base64-upload",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          base64Data: dataUrl,
+          uploadPath: "images",
+          fileName: filename,
+        }),
+      },
+      {
+        requestId,
+        operation: "Kie.ai image upload",
+        timeoutMs: getKieUploadTimeoutMs(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to upload image: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[API:${requestId}] Kie upload response:`, JSON.stringify(result).substring(0, 300));
+
+    // Check for error in response
+    if (result.code && result.code !== 200 && !result.success) {
+      throw new Error(`Upload failed: ${result.msg || 'Unknown error'}`);
+    }
+
+    // Response format: { success: true, code: 200, data: { downloadUrl: "...", fileName: "...", fileSize: 123 } }
+    const downloadUrl = result.data?.downloadUrl || result.downloadUrl || result.url;
+
+    if (!downloadUrl) {
+      console.error(`[API:${requestId}] Upload response has no URL:`, result);
+      throw new Error(`No download URL in upload response. Response: ${JSON.stringify(result).substring(0, 200)}`);
+    }
+
+    kieImageUploadCache.set(cacheKey, {
+      url: downloadUrl,
+      expiresAt: Date.now() + KIE_UPLOAD_CACHE_TTL_MS,
+    });
+
+    console.log(`[API:${requestId}] Image uploaded: ${downloadUrl.substring(0, 80)}...`);
+    return downloadUrl;
+  }).finally(() => {
+    pendingKieImageUploads.delete(cacheKey);
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to upload image: ${response.status} - ${errorText}`);
-  }
-
-  const result = await response.json();
-  console.log(`[API:${requestId}] Kie upload response:`, JSON.stringify(result).substring(0, 300));
-
-  // Check for error in response
-  if (result.code && result.code !== 200 && !result.success) {
-    throw new Error(`Upload failed: ${result.msg || 'Unknown error'}`);
-  }
-
-  // Response format: { success: true, code: 200, data: { downloadUrl: "...", fileName: "...", fileSize: 123 } }
-  const downloadUrl = result.data?.downloadUrl || result.downloadUrl || result.url;
-
-  if (!downloadUrl) {
-    console.error(`[API:${requestId}] Upload response has no URL:`, result);
-    throw new Error(`No download URL in upload response. Response: ${JSON.stringify(result).substring(0, 200)}`);
-  }
-
-  console.log(`[API:${requestId}] Image uploaded: ${downloadUrl.substring(0, 80)}...`);
-  return downloadUrl;
+  pendingKieImageUploads.set(cacheKey, uploadPromise);
+  return uploadPromise;
 }
 
 /**
@@ -400,11 +776,20 @@ export async function pollKieTaskCompletion(
 
     await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-    const response = await fetch(pollUrl, {
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
+    const response = await fetchKieWithRetry(
+      pollUrl,
+      {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+        },
       },
-    });
+      {
+        requestId,
+        operation: "Kie.ai status poll",
+        timeoutMs: getKiePollTimeoutMs(),
+        maxAttempts: 2,
+      }
+    );
 
     if (!response.ok) {
       return { success: false, error: `Failed to poll status: ${response.status}` };
@@ -470,9 +855,18 @@ export async function pollVeoTaskCompletion(
     }
     await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-    const response = await fetch(pollUrl, {
-      headers: { "Authorization": `Bearer ${apiKey}` },
-    });
+    const response = await fetchKieWithRetry(
+      pollUrl,
+      {
+        headers: { "Authorization": `Bearer ${apiKey}` },
+      },
+      {
+        requestId,
+        operation: "Kie.ai Veo status poll",
+        timeoutMs: getKiePollTimeoutMs(),
+        maxAttempts: 2,
+      }
+    );
     if (!response.ok) {
       return { success: false, error: `Failed to poll status: ${response.status}` };
     }
@@ -522,14 +916,24 @@ export async function extendVeoKieVideo(
   console.log(`[API:${requestId}] Calling Veo extend API: ${extendUrl}`);
   console.log(`[API:${requestId}] Veo extend body:`, JSON.stringify(extendBody, null, 2));
 
-  const createResponse = await fetch(extendUrl, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  await waitForKieSubmissionSlot(requestId, "Kie.ai Veo extend submission");
+  const createResponse = await fetchKieWithRetry(
+    extendUrl,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(extendBody),
     },
-    body: JSON.stringify(extendBody),
-  });
+    {
+      requestId,
+      operation: "Kie.ai Veo extend submission",
+      timeoutMs: getKieRequestTimeoutMs(),
+      idempotent: false,
+    }
+  );
 
   if (!createResponse.ok) {
     const errorText = await createResponse.text();
@@ -541,7 +945,7 @@ export async function extendVeoKieVideo(
       // Keep original text
     }
     if (createResponse.status === 429) {
-      return { success: false, error: "Veo extend: Rate limit exceeded. Try again in a moment." };
+      return { success: false, error: "Veo extend: Kie.ai concurrency limit reached (too many generations running at once). Wait for some to finish, then run this again." };
     }
     return { success: false, error: `Veo extend: ${errorDetail}` };
   }
@@ -584,7 +988,15 @@ export async function extendVeoKieVideo(
   }
 
   console.log(`[API:${requestId}] Fetching Veo extend output from: ${mediaUrl.substring(0, 80)}...`);
-  const mediaResponse = await fetch(mediaUrl);
+  const mediaResponse = await fetchKieWithRetry(
+    mediaUrl,
+    {},
+    {
+      requestId,
+      operation: "Kie.ai Veo extend output fetch",
+      timeoutMs: getKieOutputTimeoutMs(),
+    }
+  );
   if (!mediaResponse.ok) {
     return { success: false, error: `Failed to fetch extended video: ${mediaResponse.status}` };
   }
@@ -780,14 +1192,24 @@ export async function generateWithKie(
     console.log(`[API:${requestId}] Calling Veo API: ${veoUrl}`);
     console.log(`[API:${requestId}] Veo request body:`, JSON.stringify(veoBody, null, 2));
 
-    const createResponse = await fetch(veoUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    await waitForKieSubmissionSlot(requestId, "Kie.ai Veo generation submission");
+    const createResponse = await fetchKieWithRetry(
+      veoUrl,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(veoBody),
       },
-      body: JSON.stringify(veoBody),
-    });
+      {
+        requestId,
+        operation: "Kie.ai Veo generation submission",
+        timeoutMs: getKieRequestTimeoutMs(),
+        idempotent: false,
+      }
+    );
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
@@ -799,7 +1221,7 @@ export async function generateWithKie(
         // Keep original text
       }
       if (createResponse.status === 429) {
-        return { success: false, error: `${input.model.name}: Rate limit exceeded. Try again in a moment.` };
+        return { success: false, error: `${input.model.name}: Kie.ai concurrency limit reached (too many generations running at once). Wait for some to finish, then run this again.` };
       }
       return { success: false, error: `${input.model.name}: ${errorDetail}` };
     }
@@ -846,7 +1268,15 @@ export async function generateWithKie(
 
     // Fetch the video and convert to base64
     console.log(`[API:${requestId}] Fetching Veo output from: ${mediaUrl.substring(0, 80)}...`);
-    const mediaResponse = await fetch(mediaUrl);
+    const mediaResponse = await fetchKieWithRetry(
+      mediaUrl,
+      {},
+      {
+        requestId,
+        operation: "Kie.ai Veo output fetch",
+        timeoutMs: getKieOutputTimeoutMs(),
+      }
+    );
     if (!mediaResponse.ok) {
       return { success: false, error: `Failed to fetch output: ${mediaResponse.status}` };
     }
@@ -919,14 +1349,24 @@ export async function generateWithKie(
   console.log(`[API:${requestId}] Request body:`, JSON.stringify(bodyForLogging, null, 2));
 
   // Create task
-  const createResponse = await fetch(createUrl, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  await waitForKieSubmissionSlot(requestId, "Kie.ai task submission");
+  const createResponse = await fetchKieWithRetry(
+    createUrl,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
     },
-    body: JSON.stringify(requestBody),
-  });
+    {
+      requestId,
+      operation: "Kie.ai task submission",
+      timeoutMs: getKieRequestTimeoutMs(),
+      idempotent: false,
+    }
+  );
 
   if (!createResponse.ok) {
     const errorText = await createResponse.text();
@@ -941,7 +1381,7 @@ export async function generateWithKie(
     if (createResponse.status === 429) {
       return {
         success: false,
-        error: `${input.model.name}: Rate limit exceeded. Try again in a moment.`,
+        error: `${input.model.name}: Kie.ai concurrency limit reached (too many generations running at once). Wait for some to finish, then run this again.`,
       };
     }
 
@@ -1070,7 +1510,15 @@ export async function generateWithKie(
 
   // Fetch the media and convert to base64
   console.log(`[API:${requestId}] Fetching output from: ${mediaUrl.substring(0, 80)}...`);
-  const mediaResponse = await fetch(mediaUrl);
+  const mediaResponse = await fetchKieWithRetry(
+    mediaUrl,
+    {},
+    {
+      requestId,
+      operation: "Kie.ai output fetch",
+      timeoutMs: getKieOutputTimeoutMs(),
+    }
+  );
 
   if (!mediaResponse.ok) {
     return {
