@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "id": "wf_1777482754934_zwmtmvswg",
+  "name": "hvac",
+  "nodes": [
+    {
+      "id": "prompt-22",
+      "type": "prompt",
+      "position": {
+        "x": 1972.468488953691,
+        "y": 1210.328624202434
+      },
+      "data": {
+        "prompt": ""
+      },
+      "style": {
+        "width": 320,
+        "height": 220
+      },
+      "measured": {
+        "width": 320,
+        "height": 220
+      },
+      "selected": false,
+      "className": "",
+      "groupId": "group-1"
+    },
+    {
+      "id": "prompt-23",
+      "type": "prompt",
+      "position": {
+        "x": 1969.802660710951,
+        "y": 1469.430738975034
+      },
+      "data": {
+        "prompt": ""
+      },
+      "style": {
+        "width": 320,
+        "height": 220
+      },
+      "measured": {
+        "width": 320,
+        "height": 220
+      },
+      "selected": false,
+      "className": "",
+      "groupId": "group-1"
+    },
+    {
+      "id": "prompt-24",
+      "type": "prompt",
+      "position": {
+        "x": 1965.056089557756,
+        "y": 1739.548643534554
+      },
+      "data": {
+        "prompt": ""
+      },
+      "style": {
+        "width": 320,
+        "height": 220
+      },
+      "measured": {
+        "width": 320,
+        "height": 220
+      },
+      "selected": false,
+      "className": "",
+      "groupId": "group-1"
+    },
+    {
+      "id": "llmGenerate-25",
+      "type": "llmGenerate",
+      "position": {
+        "x": 2537.6856974389434,
+        "y": 1361.4765376437563
+      },
+      "data": {
+        "inputPrompt": null,
+        "inputImages": [],
+        "outputText": null,
+        "provider": "google",
+        "model": "gemini-3.1-pro-preview",
+        "temperature": 0.7,
+        "maxTokens": 8192,
+        "status": "idle",
+        "error": null,
+        "_settingsPanelHeight": 149.125
+      },
+      "style": {
+        "width": 320,
+        "height": 509.125
+      },
+      "measured": {
+        "width": 320,
+        "height": 509
+      },
+      "className": "",
+      "width": 320,
+      "height": 509.125,
+      "selected": false,
+      "dragging": false,
+      "groupId": "group-1"
+    },
+    {
+      "id": "prompt-26",
+      "type": "prompt",
+      "position": {
+        "x": 3276.4732851668273,
+        "y": 1442.1726937983308
+      },
+      "data": {
+        "prompt": ""
+      },
+      "style": {
+        "width": 320,
+        "height": 220
+      },
+      "measured": {
+        "width": 320,
+        "height": 220
+      },
+      "selected": false,
+      "className": "",
+      "groupId": "group-2"
+    },
+    {
+      "id": "prompt-27",
+      "type": "prompt",
+      "position": {
+        "x": 3280.4278481478273,
+        "y": 1720.9395627018735
+      },
+      "data": {
+        "prompt": ""
+      },
+      "style": {
+        "width": 320,
+        "height": 220
+      },
+      "measured": {
+        "width": 320,
+        "height": 220
+      },
+      "className": "",
+      "selected": false,
+      "groupId": "group-2"
+    },
+    {
+      "id": "promptConstructor-28",
+      "type": "promptConstructor",
+      "position": {
+        "x": 3845.054158064875,
+        "y": 1516.7355180271527
+      },
+      "data": {
+        "template": "",
+        "outputText": null,
+        "unresolvedVars": []
+      },
+      "style": {
+        "width": 340,
+        "height": 280
+      },
+      "measured": {
+        "width": 340,
+        "height": 280
+      },
+      "className": "",
+      "selected": false,
+      "groupId": "group-2"
+    }
+  ],
+  "edges": [
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "prompt-22",
+      "sourceHandle": "text",
+      "target": "llmGenerate-25",
+      "targetHandle": "text",
+      "id": "edge-prompt-22-llmGenerate-25-text-text",
+      "data": {
+        "createdAt": 1778936933898
+      },
+      "selected": false
+    },
+    {
+      "source": "prompt-23",
+      "sourceHandle": "text",
+      "target": "llmGenerate-25",
+      "targetHandle": "text",
+      "id": "edge-prompt-23-llmGenerate-25-text-text",
+      "data": {
+        "createdAt": 1778936935302
+      },
+      "selected": false
+    },
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "prompt-24",
+      "sourceHandle": "text",
+      "target": "llmGenerate-25",
+      "targetHandle": "text",
+      "id": "edge-prompt-24-llmGenerate-25-text-text",
+      "data": {
+        "createdAt": 1778936937066
+      },
+      "selected": false
+    },
+    {
+      "source": "llmGenerate-25",
+      "sourceHandle": "text",
+      "target": "prompt-26",
+      "targetHandle": "text",
+      "id": "edge-llmGenerate-25-prompt-26-text-text",
+      "data": {
+        "createdAt": 1778936948378
+      },
+      "selected": false
+    },
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "prompt-26",
+      "sourceHandle": "text",
+      "target": "promptConstructor-28",
+      "targetHandle": "text",
+      "id": "edge-prompt-26-promptConstructor-28-text-text",
+      "data": {
+        "createdAt": 1778936970928
+      },
+      "selected": false
+    },
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "prompt-27",
+      "sourceHandle": "text",
+      "target": "promptConstructor-28",
+      "targetHandle": "text",
+      "id": "edge-prompt-27-promptConstructor-28-text-text",
+      "data": {
+        "createdAt": 1778936972486
+      },
+      "selected": false
+    }
+  ],
+  "edgeStyle": "curved",
+  "groups": {
+    "group-1": {
+      "id": "group-1",
+      "name": "Example Step 1",
+      "color": "neutral",
+      "position": {
+        "x": 1945.056089557756,
+        "y": 1190.328624202434
+      },
+      "size": {
+        "width": 932.6296078811874,
+        "height": 789.22001933212
+      }
+    },
+    "group-2": {
+      "id": "group-2",
+      "name": "Example Step 2",
+      "color": "blue",
+      "position": {
+        "x": 3256.4732851668273,
+        "y": 1422.1726937983308
+      },
+      "size": {
+        "width": 948.5808728980478,
+        "height": 538.7668689035427
+      }
+    }
+  }
+}

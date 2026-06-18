@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "id": "wf_1774659132140_awd39r4hv",
+  "name": "test",
+  "nodes": [
+    {
+      "id": "nanoBanana-1",
+      "type": "nanoBanana",
+      "position": {
+        "x": 853.691226288838,
+        "y": 455.5460920573513
+      },
+      "data": {
+        "inputImages": [],
+        "inputPrompt": "{\n\"scene\": \"A 24-year-old Brazilian Canadian woman stands in a bright, sunlit bedroom filled with lush green plants, the natural light pouring in through a nearby window and softly illuminating the space. The atmosphere feels warm, fresh, and inviting, with a subtle lived-in authenticity that reflects a relaxed, everyday moment. The environment enhances a sense of calm and positivity, with soft shadows cast across the room and gentle highlights catching on the leaves and surrounding textures.\",\n\"subject\": \"She has extremely voluminous 3A–4C curls that are bouncy, well-defined, and healthy with a natural shine. Her hair is styled in a side part, cascading around her face with minimal frizz, framing her features in a soft and flattering way. Her expression is joyful and approachable, with a natural smile and relaxed demeanor that feels candid and genuine.\",\n\"environment\": \"The bedroom features a cozy, airy layout with plants placed throughout the background, creating a vibrant and organic backdrop. Light-toned bedding and subtle decor elements complement the greenery, while the sunlight enhances the textures and depth of the space.\",\n\"lighting\": \"Soft natural sunlight streams through the window, creating a bright yet diffused glow across her face and surroundings. The lighting is even and flattering, with gentle highlights on her hair and skin and soft shadows adding dimension without harsh contrast.\",\n\"composition\": \"Handheld 16:9 UGC framing at arm’s length, slightly off-center and organic, mimicking a real, self-captured moment. The subject fills the foreground while the plant-filled bedroom remains visible but softly recedes into the background, creating depth and authenticity. The framing avoids showing the hand, maintaining a natural floating perspective.\",\n\"motion\": \"Subtle natural movement in her curls as they lightly bounce and settle, adding life to the frame while maintaining a relaxed and effortless feel.\",\n\"camera\": \"Eye-level perspective with slight handheld micro-movements, shallow depth of field to keep the subject crisp while softly blurring the background, natural lens distortion consistent with a front-facing smartphone camera\",\n\"style\": \"photorealistic, cinematic yet casual UGC aesthetic, soft natural color grading, realistic skin texture, high dynamic range, modern lifestyle content, 35mm film look with subtle grain\"\n}",
+        "outputImage": null,
+        "aspectRatio": "1:1",
+        "resolution": "512",
+        "model": "nano-banana-pro",
+        "selectedModel": {
+          "provider": "higgsfield",
+          "modelId": "soul-standard",
+          "displayName": "Soul Standard",
+          "capabilities": [
+            "text-to-image"
+          ]
+        },
+        "useGoogleSearch": false,
+        "useImageSearch": false,
+        "status": "complete",
+        "error": null,
+        "imageHistory": [
+          {
+            "id": "1774659024209",
+            "timestamp": 1774659024209,
+            "prompt": "{\n\"scene\": \"A 24-year-old Brazilian Canadian woman stands in a bright, sunlit bedroom filled with lush green plants, the natural light pouring in through a nearby window and softly illuminating the space. The atmosphere feels warm, fresh, and inviting, with a subtle lived-in authenticity that reflects a relaxed, everyday moment. The environment enhances a sense of calm and positivity, with soft shadows cast across the room and gentle highlights catching on the leaves and surrounding textures.\",\n\"subject\": \"She has extremely voluminous 3A–4C curls that are bouncy, well-defined, and healthy with a natural shine. Her hair is styled in a side part, cascading around her face with minimal frizz, framing her features in a soft and flattering way. Her expression is joyful and approachable, with a natural smile and relaxed demeanor that feels candid and genuine.\",\n\"environment\": \"The bedroom features a cozy, airy layout with plants placed throughout the background, creating a vibrant and organic backdrop. Light-toned bedding and subtle decor elements complement the greenery, while the sunlight enhances the textures and depth of the space.\",\n\"lighting\": \"Soft natural sunlight streams through the window, creating a bright yet diffused glow across her face and surroundings. The lighting is even and flattering, with gentle highlights on her hair and skin and soft shadows adding dimension without harsh contrast.\",\n\"composition\": \"Handheld 16:9 UGC framing at arm’s length, slightly off-center and organic, mimicking a real, self-captured moment. The subject fills the foreground while the plant-filled bedroom remains visible but softly recedes into the background, creating depth and authenticity. The framing avoids showing the hand, maintaining a natural floating perspective.\",\n\"motion\": \"Subtle natural movement in her curls as they lightly bounce and settle, adding life to the frame while maintaining a relaxed and effortless feel.\",\n\"camera\": \"Eye-level perspective with slight handheld micro-movements, shallow depth of field to keep the subject crisp while softly blurring the background, natural lens distortion consistent with a front-facing smartphone camera\",\n\"style\": \"photorealistic, cinematic yet casual UGC aesthetic, soft natural color grading, realistic skin texture, high dynamic range, modern lifestyle content, 35mm film look with subtle grain\"\n}",
+            "aspectRatio": "1:1",
+            "model": "nano-banana-pro"
+          }
+        ],
+        "selectedHistoryIndex": 0,
+        "_settingsPanelHeight": 236.5,
+        "parameters": {
+          "style_id": "1b798b54-03da-446a-93bf-12fcba1050d7",
+          "enhance_prompt": false,
+          "batch_size": 1,
+          "resolution": "720p",
+          "aspect_ratio": "16:9"
+        },
+        "inputSchema": [
+          {
+            "name": "prompt",
+            "type": "text",
+            "required": true,
+            "label": "Prompt"
+          }
+        ],
+        "parametersExpanded": true,
+        "outputImageRef": "1774659024209"
+      },
+      "style": {
+        "width": 300,
+        "height": 536.5
+      },
+      "measured": {
+        "width": 300,
+        "height": 537
+      },
+      "className": "",
+      "width": 300,
+      "height": 536.5,
+      "selected": false
+    },
+    {
+      "id": "prompt-2",
+      "type": "prompt",
+      "position": {
+        "x": 430.1954888740312,
+        "y": 693.1036890088405
+      },
+      "data": {
+        "prompt": "{\n\"scene\": \"A 24-year-old Brazilian Canadian woman stands in a bright, sunlit bedroom filled with lush green plants, the natural light pouring in through a nearby window and softly illuminating the space. The atmosphere feels warm, fresh, and inviting, with a subtle lived-in authenticity that reflects a relaxed, everyday moment. The environment enhances a sense of calm and positivity, with soft shadows cast across the room and gentle highlights catching on the leaves and surrounding textures.\",\n\"subject\": \"She has extremely voluminous 3A–4C curls that are bouncy, well-defined, and healthy with a natural shine. Her hair is styled in a side part, cascading around her face with minimal frizz, framing her features in a soft and flattering way. Her expression is joyful and approachable, with a natural smile and relaxed demeanor that feels candid and genuine.\",\n\"environment\": \"The bedroom features a cozy, airy layout with plants placed throughout the background, creating a vibrant and organic backdrop. Light-toned bedding and subtle decor elements complement the greenery, while the sunlight enhances the textures and depth of the space.\",\n\"lighting\": \"Soft natural sunlight streams through the window, creating a bright yet diffused glow across her face and surroundings. The lighting is even and flattering, with gentle highlights on her hair and skin and soft shadows adding dimension without harsh contrast.\",\n\"composition\": \"Handheld 16:9 UGC framing at arm’s length, slightly off-center and organic, mimicking a real, self-captured moment. The subject fills the foreground while the plant-filled bedroom remains visible but softly recedes into the background, creating depth and authenticity. The framing avoids showing the hand, maintaining a natural floating perspective.\",\n\"motion\": \"Subtle natural movement in her curls as they lightly bounce and settle, adding life to the frame while maintaining a relaxed and effortless feel.\",\n\"camera\": \"Eye-level perspective with slight handheld micro-movements, shallow depth of field to keep the subject crisp while softly blurring the background, natural lens distortion consistent with a front-facing smartphone camera\",\n\"style\": \"photorealistic, cinematic yet casual UGC aesthetic, soft natural color grading, realistic skin texture, high dynamic range, modern lifestyle content, 35mm film look with subtle grain\"\n}"
+      },
+      "style": {
+        "width": 320,
+        "height": 220
+      },
+      "measured": {
+        "width": 320,
+        "height": 220
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "nanoBanana-3",
+      "type": "nanoBanana",
+      "position": {
+        "x": 868.5324721650992,
+        "y": 1057.2933561246464
+      },
+      "data": {
+        "inputImages": [],
+        "inputPrompt": "{\n\"scene\": \"A 24-year-old Brazilian Canadian woman stands in a bright, sunlit bedroom filled with lush green plants, the natural light pouring in through a nearby window and softly illuminating the space. The atmosphere feels warm, fresh, and inviting, with a subtle lived-in authenticity that reflects a relaxed, everyday moment. The environment enhances a sense of calm and positivity, with soft shadows cast across the room and gentle highlights catching on the leaves and surrounding textures.\",\n\"subject\": \"She has extremely voluminous 3A–4C curls that are bouncy, well-defined, and healthy with a natural shine. Her hair is styled in a side part, cascading around her face with minimal frizz, framing her features in a soft and flattering way. Her expression is joyful and approachable, with a natural smile and relaxed demeanor that feels candid and genuine.\",\n\"environment\": \"The bedroom features a cozy, airy layout with plants placed throughout the background, creating a vibrant and organic backdrop. Light-toned bedding and subtle decor elements complement the greenery, while the sunlight enhances the textures and depth of the space.\",\n\"lighting\": \"Soft natural sunlight streams through the window, creating a bright yet diffused glow across her face and surroundings. The lighting is even and flattering, with gentle highlights on her hair and skin and soft shadows adding dimension without harsh contrast.\",\n\"composition\": \"Handheld 16:9 UGC framing at arm’s length, slightly off-center and organic, mimicking a real, self-captured moment. The subject fills the foreground while the plant-filled bedroom remains visible but softly recedes into the background, creating depth and authenticity. The framing avoids showing the hand, maintaining a natural floating perspective.\",\n\"motion\": \"Subtle natural movement in her curls as they lightly bounce and settle, adding life to the frame while maintaining a relaxed and effortless feel.\",\n\"camera\": \"Eye-level perspective with slight handheld micro-movements, shallow depth of field to keep the subject crisp while softly blurring the background, natural lens distortion consistent with a front-facing smartphone camera\",\n\"style\": \"photorealistic, cinematic yet casual UGC aesthetic, soft natural color grading, realistic skin texture, high dynamic range, modern lifestyle content, 35mm film look with subtle grain\"\n}",
+        "outputImage": null,
+        "aspectRatio": "1:1",
+        "resolution": "1K",
+        "model": "nano-banana-pro",
+        "selectedModel": {
+          "provider": "gemini",
+          "modelId": "nano-banana-2",
+          "displayName": "Nano Banana 2"
+        },
+        "useGoogleSearch": false,
+        "useImageSearch": false,
+        "status": "idle",
+        "error": null,
+        "imageHistory": [
+          {
+            "id": "1774659056256",
+            "timestamp": 1774659056256,
+            "prompt": "{\n\"scene\": \"A 24-year-old Brazilian Canadian woman stands in a bright, sunlit bedroom filled with lush green plants, the natural light pouring in through a nearby window and softly illuminating the space. The atmosphere feels warm, fresh, and inviting, with a subtle lived-in authenticity that reflects a relaxed, everyday moment. The environment enhances a sense of calm and positivity, with soft shadows cast across the room and gentle highlights catching on the leaves and surrounding textures.\",\n\"subject\": \"She has extremely voluminous 3A–4C curls that are bouncy, well-defined, and healthy with a natural shine. Her hair is styled in a side part, cascading around her face with minimal frizz, framing her features in a soft and flattering way. Her expression is joyful and approachable, with a natural smile and relaxed demeanor that feels candid and genuine.\",\n\"environment\": \"The bedroom features a cozy, airy layout with plants placed throughout the background, creating a vibrant and organic backdrop. Light-toned bedding and subtle decor elements complement the greenery, while the sunlight enhances the textures and depth of the space.\",\n\"lighting\": \"Soft natural sunlight streams through the window, creating a bright yet diffused glow across her face and surroundings. The lighting is even and flattering, with gentle highlights on her hair and skin and soft shadows adding dimension without harsh contrast.\",\n\"composition\": \"Handheld 16:9 UGC framing at arm’s length, slightly off-center and organic, mimicking a real, self-captured moment. The subject fills the foreground while the plant-filled bedroom remains visible but softly recedes into the background, creating depth and authenticity. The framing avoids showing the hand, maintaining a natural floating perspective.\",\n\"motion\": \"Subtle natural movement in her curls as they lightly bounce and settle, adding life to the frame while maintaining a relaxed and effortless feel.\",\n\"camera\": \"Eye-level perspective with slight handheld micro-movements, shallow depth of field to keep the subject crisp while softly blurring the background, natural lens distortion consistent with a front-facing smartphone camera\",\n\"style\": \"photorealistic, cinematic yet casual UGC aesthetic, soft natural color grading, realistic skin texture, high dynamic range, modern lifestyle content, 35mm film look with subtle grain\"\n}",
+            "aspectRatio": "1:1",
+            "model": "nano-banana-pro"
+          }
+        ],
+        "selectedHistoryIndex": 0,
+        "_settingsPanelHeight": 167.25
+      },
+      "style": {
+        "width": 367,
+        "height": 467
+      },
+      "measured": {
+        "width": 300,
+        "height": 467
+      },
+      "className": "",
+      "width": 300,
+      "height": 467.25,
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "imageInput-4",
+      "type": "imageInput",
+      "position": {
+        "x": 1496.845429882059,
+        "y": 1437.5434178913645
+      },
+      "data": {
+        "image": null,
+        "filename": null,
+        "dimensions": null
+      },
+      "style": {
+        "width": 300,
+        "height": 280
+      },
+      "measured": {
+        "width": 300,
+        "height": 280
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "output-5",
+      "type": "output",
+      "position": {
+        "x": 1252.0278108679008,
+        "y": 488.1876095405506
+      },
+      "data": {
+        "image": null,
+        "outputFilename": "",
+        "video": null,
+        "contentType": "image"
+      },
+      "style": {
+        "width": 320,
+        "height": 320
+      },
+      "measured": {
+        "width": 320,
+        "height": 320
+      },
+      "selected": true,
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "prompt-2",
+      "sourceHandle": "text",
+      "target": "nanoBanana-1",
+      "targetHandle": "text",
+      "id": "edge-prompt-2-nanoBanana-1-text-text",
+      "data": {
+        "createdAt": 1774658999718
+      },
+      "selected": false
+    },
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "prompt-2",
+      "sourceHandle": "text",
+      "target": "nanoBanana-3",
+      "targetHandle": "text",
+      "id": "edge-prompt-2-nanoBanana-3-text-text",
+      "data": {
+        "createdAt": 1774659018033
+      },
+      "selected": false
+    },
+    {
+      "type": "editable",
+      "animated": false,
+      "source": "nanoBanana-1",
+      "sourceHandle": "image",
+      "target": "output-5",
+      "targetHandle": "image",
+      "id": "edge-nanoBanana-1-output-5-image-image",
+      "data": {
+        "createdAt": 1774659222289
+      }
+    }
+  ],
+  "edgeStyle": "curved"
+}

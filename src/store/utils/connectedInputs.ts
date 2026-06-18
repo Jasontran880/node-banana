@@ -10,6 +10,8 @@ import {
   WorkflowEdge,
   ImageInputNodeData,
   AudioInputNodeData,
+  VideoInputNodeData,
+  VideoUpscalerNodeData,
   AnnotationNodeData,
   NanoBananaNodeData,
   GenerateVideoNodeData,
@@ -23,11 +25,25 @@ import {
   ArrayNodeData,
   PromptConstructorNodeData,
   LLMGenerateNodeData,
+  ImageUpscalerNodeData,
   GLBViewerNodeData,
   SwitchNodeData,
   ConditionalSwitchNodeData,
   MatchMode,
 } from "@/types";
+
+/**
+ * Isolated output data produced by a single parallel workflow run.
+ * Keyed by nodeId inside each RunState's outputs map.
+ */
+export interface RunNodeOutputs {
+  outputImage?: string | null;
+  outputText?: string | null;
+  outputVideo?: string | null;
+  outputAudio?: string | null;
+  output3dUrl?: string | null;
+  capturedImage?: string | null;
+}
 
 /**
  * Return type for getConnectedInputs
@@ -59,35 +75,47 @@ function isTextHandle(handleId: string | null | undefined): boolean {
 }
 
 /**
- * Extract output data and type from a source node
+ * Extract output data and type from a source node.
+ * When runOutputs is provided, generated-node outputs are read from there first
+ * (for per-run isolation during parallel workflow execution).
  */
 function getSourceOutput(
   sourceNode: WorkflowNode,
   sourceHandle: string | null | undefined,
-  edgeData?: Record<string, unknown>
+  edgeData?: Record<string, unknown>,
+  runOutputs?: Map<string, RunNodeOutputs>
 ): { type: "image" | "text" | "video" | "audio" | "3d"; value: string | null } {
+  // Run-isolated output overrides for generated nodes (parallel run support)
+  const runData = runOutputs?.get(sourceNode.id);
+
   if (sourceNode.type === "imageInput") {
     return { type: "image", value: (sourceNode.data as ImageInputNodeData).image };
   } else if (sourceNode.type === "audioInput") {
     return { type: "audio", value: (sourceNode.data as AudioInputNodeData).audioFile };
+  } else if (sourceNode.type === "videoInput") {
+    return { type: "video", value: (sourceNode.data as VideoInputNodeData).videoFile };
+  } else if (sourceNode.type === "videoUpscaler") {
+    return { type: "video", value: (runData?.outputVideo ?? (sourceNode.data as VideoUpscalerNodeData).outputVideo) ?? null };
   } else if (sourceNode.type === "annotation") {
-    return { type: "image", value: (sourceNode.data as AnnotationNodeData).outputImage };
+    return { type: "image", value: (runData?.outputImage ?? (sourceNode.data as AnnotationNodeData).outputImage) ?? null };
+  } else if (sourceNode.type === "imageUpscaler") {
+    return { type: "image", value: (runData?.outputImage ?? (sourceNode.data as ImageUpscalerNodeData).outputImage) ?? null };
   } else if (sourceNode.type === "nanoBanana") {
     const nbData = sourceNode.data as NanoBananaNodeData;
-    return { type: "image", value: nbData.outputImage };
+    return { type: "image", value: (runData?.outputImage ?? nbData.outputImage) ?? null };
   } else if (sourceNode.type === "generate3d") {
     const g3dData = sourceNode.data as Generate3DNodeData;
-    return { type: "3d", value: g3dData.output3dUrl };
+    return { type: "3d", value: (runData?.output3dUrl ?? g3dData.output3dUrl) ?? null };
   } else if (sourceNode.type === "generateVideo") {
-    return { type: "video", value: (sourceNode.data as GenerateVideoNodeData).outputVideo };
+    return { type: "video", value: (runData?.outputVideo ?? (sourceNode.data as GenerateVideoNodeData).outputVideo) ?? null };
   } else if (sourceNode.type === "generateAudio") {
-    return { type: "audio", value: (sourceNode.data as GenerateAudioNodeData).outputAudio };
+    return { type: "audio", value: (runData?.outputAudio ?? (sourceNode.data as GenerateAudioNodeData).outputAudio) ?? null };
   } else if (sourceNode.type === "videoStitch") {
-    return { type: "video", value: (sourceNode.data as VideoStitchNodeData).outputVideo };
+    return { type: "video", value: (runData?.outputVideo ?? (sourceNode.data as VideoStitchNodeData).outputVideo) ?? null };
   } else if (sourceNode.type === "easeCurve") {
-    return { type: "video", value: (sourceNode.data as EaseCurveNodeData).outputVideo };
+    return { type: "video", value: (runData?.outputVideo ?? (sourceNode.data as EaseCurveNodeData).outputVideo) ?? null };
   } else if (sourceNode.type === "videoTrim") {
-    return { type: "video", value: (sourceNode.data as VideoTrimNodeData).outputVideo };
+    return { type: "video", value: (runData?.outputVideo ?? (sourceNode.data as VideoTrimNodeData).outputVideo) ?? null };
   } else if (sourceNode.type === "prompt") {
     return { type: "text", value: (sourceNode.data as PromptNodeData).prompt };
   } else if (sourceNode.type === "array") {
@@ -110,11 +138,11 @@ function getSourceOutput(
     const pcData = sourceNode.data as PromptConstructorNodeData;
     return { type: "text", value: pcData.outputText ?? pcData.template ?? null };
   } else if (sourceNode.type === "llmGenerate") {
-    return { type: "text", value: (sourceNode.data as LLMGenerateNodeData).outputText };
+    return { type: "text", value: (runData?.outputText ?? (sourceNode.data as LLMGenerateNodeData).outputText) ?? null };
   } else if (sourceNode.type === "videoFrameGrab") {
-    return { type: "image", value: (sourceNode.data as VideoFrameGrabNodeData).outputImage };
+    return { type: "image", value: (runData?.outputImage ?? (sourceNode.data as VideoFrameGrabNodeData).outputImage) ?? null };
   } else if (sourceNode.type === "glbViewer") {
-    return { type: "image", value: (sourceNode.data as GLBViewerNodeData).capturedImage };
+    return { type: "image", value: (runData?.capturedImage ?? (sourceNode.data as GLBViewerNodeData).capturedImage) ?? null };
   }
   return { type: "image", value: null };
 }
@@ -163,7 +191,8 @@ export function getConnectedInputsPure(
   nodes: WorkflowNode[],
   edges: WorkflowEdge[],
   visited?: Set<string>,
-  dimmedNodeIds?: Set<string>
+  dimmedNodeIds?: Set<string>,
+  runOutputs?: Map<string, RunNodeOutputs>
 ): ConnectedInputs {
   const _visited = visited || new Set<string>();
   if (_visited.has(nodeId)) return { images: [], videos: [], audio: [], model3d: null, text: null, dynamicInputs: {}, easeCurve: null };
@@ -218,7 +247,7 @@ export function getConnectedInputsPure(
       // Router passthrough — traverse upstream to find actual data source
       if (sourceNode.type === "router") {
         const routerInputs = passthroughCache.get(sourceNode.id)
-          ?? getConnectedInputsPure(sourceNode.id, nodes, edges, _visited, dimmedNodeIds);
+          ?? getConnectedInputsPure(sourceNode.id, nodes, edges, _visited, dimmedNodeIds, runOutputs);
         passthroughCache.set(sourceNode.id, routerInputs);
         // Determine which type this edge carries based on the source handle
         const edgeType = edge.sourceHandle; // Will be "image", "text", "video", "audio", "3d", or "easeCurve"
@@ -253,7 +282,7 @@ export function getConnectedInputsPure(
 
         // Enabled switch: recursively get upstream data (same pattern as router)
         const switchInputs = passthroughCache.get(sourceNode.id)
-          ?? getConnectedInputsPure(sourceNode.id, nodes, edges, _visited, dimmedNodeIds);
+          ?? getConnectedInputsPure(sourceNode.id, nodes, edges, _visited, dimmedNodeIds, runOutputs);
         passthroughCache.set(sourceNode.id, switchInputs);
         const edgeType = switchData.inputType;
 
@@ -306,7 +335,8 @@ export function getConnectedInputsPure(
       const { type, value } = getSourceOutput(
         sourceNode,
         edge.sourceHandle,
-        (edge.data as Record<string, unknown> | undefined)
+        (edge.data as Record<string, unknown> | undefined),
+        runOutputs
       );
 
       if (!value) return;

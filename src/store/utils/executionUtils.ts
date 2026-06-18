@@ -9,7 +9,7 @@ import { WorkflowNode, WorkflowEdge, WorkflowNodeData } from "@/types";
 
 // Concurrency settings
 export const CONCURRENCY_SETTINGS_KEY = "node-banana-concurrency-limit";
-export const DEFAULT_MAX_CONCURRENT_CALLS = 3;
+export const DEFAULT_MAX_CONCURRENT_CALLS = 30;
 
 /**
  * Load concurrency setting from localStorage
@@ -19,7 +19,7 @@ export const loadConcurrencySetting = (): number => {
   const stored = localStorage.getItem(CONCURRENCY_SETTINGS_KEY);
   if (stored) {
     const parsed = parseInt(stored, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) {
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
       return parsed;
     }
   }
@@ -136,5 +136,30 @@ export function clearNodeImageRefs(nodes: WorkflowNode[]): WorkflowNode[] {
     delete data.inputImageRefs;
 
     return { ...node, data: data as WorkflowNodeData } as WorkflowNode;
+  });
+}
+
+/**
+ * Strip inline base64 `data` from carousel image history items before saving.
+ * These are fast-path caches; the `id` still points to the file on disk.
+ * Without this, workflows with many generation nodes can exceed JS's max
+ * string length during JSON.stringify and fail to save.
+ */
+export function stripCarouselImageData(nodes: WorkflowNode[]): WorkflowNode[] {
+  return nodes.map(node => {
+    const data = node.data as Record<string, unknown>;
+    if (!Array.isArray(data.imageHistory)) return node;
+
+    const strippedHistory = (data.imageHistory as Array<Record<string, unknown>>).map(item => {
+      if (!('data' in item)) return item;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { data: _cachedData, ...rest } = item;
+      return rest;
+    });
+
+    return {
+      ...node,
+      data: { ...data, imageHistory: strippedHistory } as WorkflowNodeData,
+    } as WorkflowNode;
   });
 }

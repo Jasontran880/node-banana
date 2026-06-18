@@ -7,6 +7,15 @@
 # testing
 /coverage
 
+# Within each project, commit metadata (.json) plus the inputs/ and outputs/
+# folders. Everything else — generated media (generations/), archives, and any
+# loose scratch files — stays out of the commit.
+/projects/**
+!/projects/**/
+!/projects/**/*.json
+!/projects/**/inputs/**
+!/projects/**/outputs/**
+
 # next.js
 /.next/
 /out/

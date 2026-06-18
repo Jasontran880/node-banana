@@ -126,7 +126,7 @@ export function ModelSearchDialog({
     trackModelUsage,
   } = useWorkflowStore();
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, geminiAgentApiKey } = useProviderApiKeys();
   const { screenToFlowPosition } = useReactFlow();
 
   // State
@@ -232,6 +232,12 @@ export function ModelSearchDialog({
       if (wavespeedApiKey) {
         headers["X-WaveSpeed-Key"] = wavespeedApiKey;
       }
+      if (muapiApiKey) {
+        headers["X-Muapi-Key"] = muapiApiKey;
+      }
+      if (geminiAgentApiKey) {
+        headers["X-Gemini-Agent-Key"] = geminiAgentApiKey;
+      }
 
       const response = await deduplicatedFetch(`/api/models?${params.toString()}`, {
         headers,
@@ -269,7 +275,7 @@ export function ModelSearchDialog({
         setIsLoading(false);
       }
     }
-  }, [debouncedSearch, providerFilter, capabilityFilter, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey]);
+  }, [debouncedSearch, providerFilter, capabilityFilter, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, geminiAgentApiKey]);
 
   // Fetch models when filters change
   useEffect(() => {
@@ -385,6 +391,8 @@ export function ModelSearchDialog({
     switch (provider) {
       case "gemini":
         return "bg-green-500/20 text-green-300";
+      case "geminiAgent":
+        return "bg-emerald-500/20 text-emerald-300";
       case "replicate":
         return "bg-blue-500/20 text-blue-300";
       case "fal":
@@ -393,6 +401,8 @@ export function ModelSearchDialog({
         return "bg-orange-500/20 text-orange-300";
       case "wavespeed":
         return "bg-purple-500/20 text-purple-300";
+      case "muapi":
+        return "bg-teal-500/20 text-teal-300";
       default:
         return "bg-neutral-500/20 text-neutral-300";
     }
@@ -403,6 +413,8 @@ export function ModelSearchDialog({
     switch (provider) {
       case "gemini":
         return "Gemini";
+      case "geminiAgent":
+        return "Agent Platform";
       case "replicate":
         return "Replicate";
       case "fal":
@@ -411,6 +423,8 @@ export function ModelSearchDialog({
         return "Kie.ai";
       case "wavespeed":
         return "WaveSpeed";
+      case "muapi":
+        return "mu-api";
       default:
         return provider;
     }
@@ -423,12 +437,14 @@ export function ModelSearchDialog({
     if (replicateApiKey) providers.add("replicate");
     if (kieApiKey) providers.add("kie");
     if (wavespeedApiKey) providers.add("wavespeed");
+    if (muapiApiKey) providers.add("muapi");
+    if (geminiAgentApiKey) providers.add("geminiAgent");
     // Server-side keys (from env vars, reported by /api/models)
     for (const p of serverAvailableProviders) {
       providers.add(p as ProviderType);
     }
     return providers;
-  }, [replicateApiKey, kieApiKey, wavespeedApiKey, serverAvailableProviders]);
+  }, [replicateApiKey, kieApiKey, wavespeedApiKey, muapiApiKey, geminiAgentApiKey, serverAvailableProviders]);
 
   // Reset provider filter if current selection becomes unavailable
   useEffect(() => {
@@ -693,6 +709,32 @@ export function ModelSearchDialog({
                   }`}
                 >
                   <WaveSpeedIcon />
+                </button>
+              )}
+              {availableProviders.has("muapi") && (
+                <button
+                  onClick={() => setProviderFilter("muapi")}
+                  title="mu-api"
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    providerFilter === "muapi"
+                      ? "bg-teal-500/20 text-teal-300"
+                      : "text-neutral-400 hover:text-teal-300 hover:bg-neutral-700"
+                  }`}
+                >
+                  mu
+                </button>
+              )}
+              {availableProviders.has("geminiAgent") && (
+                <button
+                  onClick={() => setProviderFilter("geminiAgent")}
+                  title="Gemini Agent Platform"
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    providerFilter === "geminiAgent"
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "text-neutral-400 hover:text-emerald-300 hover:bg-neutral-700"
+                  }`}
+                >
+                  GA
                 </button>
               )}
             </div>

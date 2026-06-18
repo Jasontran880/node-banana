@@ -203,7 +203,7 @@ describe("concurrency settings", () => {
   it("should reject out-of-range values", () => {
     mockStorage[CONCURRENCY_SETTINGS_KEY] = "0";
     expect(loadConcurrencySetting()).toBe(DEFAULT_MAX_CONCURRENT_CALLS);
-    mockStorage[CONCURRENCY_SETTINGS_KEY] = "11";
+    mockStorage[CONCURRENCY_SETTINGS_KEY] = "21";
     expect(loadConcurrencySetting()).toBe(DEFAULT_MAX_CONCURRENT_CALLS);
   });
 

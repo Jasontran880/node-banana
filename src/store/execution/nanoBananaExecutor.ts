@@ -156,13 +156,15 @@ export async function executeNanoBanana(
         model: nodeData.model,
       });
 
-      // Add to node's carousel history
+      // Add to node's carousel history (include inline data so navigation
+      // works immediately without requiring a generationsPath disk fetch)
       const newHistoryItem = {
         id: imageId,
         timestamp,
         prompt: promptText,
         aspectRatio: nodeData.aspectRatio,
         model: nodeData.model,
+        data: result.image,
       };
       const updatedHistory = [newHistoryItem, ...(nodeData.imageHistory || [])].slice(0, 50);
 
@@ -187,7 +189,10 @@ export async function executeNanoBanana(
         });
 
       // Track cost
-      if (nodeData.selectedModel?.provider === "fal" && nodeData.selectedModel?.pricing) {
+      if (
+        (nodeData.selectedModel?.provider === "fal" || nodeData.selectedModel?.provider === "geminiAgent") &&
+        nodeData.selectedModel?.pricing
+      ) {
         addIncurredCost(nodeData.selectedModel.pricing.amount);
       } else if (!nodeData.selectedModel || nodeData.selectedModel.provider === "gemini") {
         const generationCost = calculateGenerationCost(nodeData.model, nodeData.resolution);

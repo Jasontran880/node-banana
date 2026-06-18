@@ -1210,22 +1210,27 @@ describe("workflowStore integration tests", () => {
         expect(useWorkflowStore.getState().isRunning).toBe(false);
       });
 
-      it("should ignore execution request if already running", async () => {
+      it("should allow a new run while another is tracked in activeRuns", async () => {
+        // Seed an existing run in activeRuns to simulate an in-progress workflow
+        const existingController = new AbortController();
+        const existingRun = { currentNodeIds: ["some-node"], abortController: existingController };
         useWorkflowStore.setState({
           nodes: [
             createTestNode("prompt-1", "prompt", { prompt: "test" }),
           ],
           edges: [],
-          isRunning: true, // Already running
+          isRunning: true,
+          activeRuns: new Map([["existing-run-id", existingRun]]),
         });
 
         const store = useWorkflowStore.getState();
 
-        // This should return immediately without doing anything
+        // executeWorkflow now runs in parallel — it should complete and clean up its own run
         await store.executeWorkflow();
 
-        // Should still be running (our mock state)
+        // The existing run is still tracked; isRunning should remain true
         expect(useWorkflowStore.getState().isRunning).toBe(true);
+        expect(useWorkflowStore.getState().activeRuns.size).toBe(1);
       });
 
       it("should clear currentNodeIds after execution completes", async () => {
@@ -2324,7 +2329,7 @@ describe("workflowStore integration tests", () => {
       vi.unstubAllGlobals();
     });
 
-    it("should only execute nodes once when executeWorkflow is called concurrently", async () => {
+    it("should execute both runs when executeWorkflow is called concurrently", async () => {
       useWorkflowStore.setState({
         nodes: [
           createTestNode("prompt-1", "prompt", { prompt: "test" }),
@@ -2341,13 +2346,13 @@ describe("workflowStore integration tests", () => {
 
       const store = useWorkflowStore.getState();
 
-      // Fire two calls back-to-back without awaiting the first
+      // Fire two calls back-to-back without awaiting the first — both should run in parallel
       const p1 = store.executeWorkflow();
       const p2 = store.executeWorkflow();
       await Promise.all([p1, p2]);
 
-      // Only one execution should have reached fetch (one nanoBanana node)
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Both runs execute the nanoBanana node, so fetch is called twice
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it("should set isRunning synchronously before any await", async () => {
@@ -2473,6 +2478,185 @@ describe("workflowStore integration tests", () => {
   });
 
   describe("Group operations with non-standard node types", () => {
+    describe("group movement and clipboard behavior", () => {
+      it("should move one grouped node without moving the group when not all members are selected", () => {
+        useWorkflowStore.setState({
+          nodes: [
+            { ...createTestNode("prompt-1", "prompt", { prompt: "a" }, { x: 100, y: 100 }), selected: true, groupId: "group-1" },
+            { ...createTestNode("prompt-2", "prompt", { prompt: "b" }, { x: 300, y: 100 }), groupId: "group-1" },
+            createTestNode("prompt-3", "prompt", { prompt: "outside" }, { x: 600, y: 100 }),
+          ],
+          edges: [],
+          groups: {
+            "group-1": {
+              id: "group-1",
+              name: "Group 1",
+              color: "neutral" as const,
+              position: { x: 80, y: 80 },
+              size: { width: 460, height: 260 },
+            },
+          },
+        });
+
+        useWorkflowStore.getState().onNodesChange([
+          {
+            type: "position",
+            id: "prompt-1",
+            position: { x: 150, y: 130 },
+            dragging: true,
+          },
+        ]);
+
+        const state = useWorkflowStore.getState();
+        expect(state.groups["group-1"].position).toEqual({ x: 80, y: 80 });
+        expect(state.nodes.find((node) => node.id === "prompt-1")?.position).toEqual({ x: 150, y: 130 });
+        expect(state.nodes.find((node) => node.id === "prompt-2")?.position).toEqual({ x: 300, y: 100 });
+        expect(state.nodes.find((node) => node.id === "prompt-3")?.position).toEqual({ x: 600, y: 100 });
+      });
+
+      it("should move the group and all member nodes when every group member is selected", () => {
+        useWorkflowStore.setState({
+          nodes: [
+            { ...createTestNode("prompt-1", "prompt", { prompt: "a" }, { x: 100, y: 100 }), selected: true, groupId: "group-1" },
+            { ...createTestNode("prompt-2", "prompt", { prompt: "b" }, { x: 300, y: 100 }), selected: true, groupId: "group-1" },
+            createTestNode("prompt-3", "prompt", { prompt: "outside" }, { x: 600, y: 100 }),
+          ],
+          edges: [],
+          groups: {
+            "group-1": {
+              id: "group-1",
+              name: "Group 1",
+              color: "neutral" as const,
+              position: { x: 80, y: 80 },
+              size: { width: 460, height: 260 },
+            },
+          },
+        });
+
+        useWorkflowStore.getState().onNodesChange([
+          {
+            type: "position",
+            id: "prompt-1",
+            position: { x: 150, y: 130 },
+            dragging: true,
+          },
+        ]);
+
+        const state = useWorkflowStore.getState();
+        expect(state.groups["group-1"].position).toEqual({ x: 130, y: 110 });
+        expect(state.nodes.find((node) => node.id === "prompt-1")?.position).toEqual({ x: 150, y: 130 });
+        expect(state.nodes.find((node) => node.id === "prompt-2")?.position).toEqual({ x: 350, y: 130 });
+        expect(state.nodes.find((node) => node.id === "prompt-3")?.position).toEqual({ x: 600, y: 100 });
+      });
+
+      it("should only apply one group delta when multiple members emit drag changes", () => {
+        useWorkflowStore.setState({
+          nodes: [
+            { ...createTestNode("prompt-1", "prompt", { prompt: "a" }, { x: 100, y: 100 }), selected: true, groupId: "group-1" },
+            { ...createTestNode("prompt-2", "prompt", { prompt: "b" }, { x: 300, y: 100 }), selected: true, groupId: "group-1" },
+          ],
+          edges: [],
+          groups: {
+            "group-1": {
+              id: "group-1",
+              name: "Group 1",
+              color: "neutral" as const,
+              position: { x: 80, y: 80 },
+              size: { width: 460, height: 260 },
+            },
+          },
+        });
+
+        useWorkflowStore.getState().onNodesChange([
+          { type: "position", id: "prompt-1", position: { x: 150, y: 130 } },
+          { type: "position", id: "prompt-2", position: { x: 350, y: 130 } },
+        ]);
+
+        const state = useWorkflowStore.getState();
+        expect(state.groups["group-1"].position).toEqual({ x: 130, y: 110 });
+        expect(state.nodes.find((node) => node.id === "prompt-1")?.position).toEqual({ x: 150, y: 130 });
+        expect(state.nodes.find((node) => node.id === "prompt-2")?.position).toEqual({ x: 350, y: 130 });
+      });
+
+      it("should treat replacement position changes as grouped movement", () => {
+        const node = { ...createTestNode("prompt-1", "prompt", { prompt: "a" }, { x: 100, y: 100 }), selected: true, groupId: "group-1" };
+
+        useWorkflowStore.setState({
+          nodes: [
+            node,
+            { ...createTestNode("prompt-2", "prompt", { prompt: "b" }, { x: 300, y: 100 }), selected: true, groupId: "group-1" },
+          ],
+          edges: [],
+          groups: {
+            "group-1": {
+              id: "group-1",
+              name: "Group 1",
+              color: "neutral" as const,
+              position: { x: 80, y: 80 },
+              size: { width: 460, height: 260 },
+            },
+          },
+        });
+
+        useWorkflowStore.getState().onNodesChange([
+          {
+            type: "replace",
+            id: "prompt-1",
+            item: { ...node, position: { x: 150, y: 130 } },
+          },
+        ]);
+
+        const state = useWorkflowStore.getState();
+        expect(state.groups["group-1"].position).toEqual({ x: 130, y: 110 });
+        expect(state.nodes.find((n) => n.id === "prompt-1")?.position).toEqual({ x: 150, y: 130 });
+        expect(state.nodes.find((n) => n.id === "prompt-2")?.position).toEqual({ x: 350, y: 130 });
+      });
+
+      it("should copy and paste grouped nodes with a cloned group", () => {
+        useWorkflowStore.setState({
+          nodes: [
+            { ...createTestNode("prompt-1", "prompt", { prompt: "a" }, { x: 100, y: 100 }), selected: true, groupId: "group-1" },
+            { ...createTestNode("prompt-2", "prompt", { prompt: "b" }, { x: 300, y: 100 }), selected: true, groupId: "group-1" },
+          ],
+          edges: [createTestEdge("prompt-1", "prompt-2", "text", "text")],
+          groups: {
+            "group-1": {
+              id: "group-1",
+              name: "Group 1",
+              color: "blue" as const,
+              position: { x: 80, y: 80 },
+              size: { width: 460, height: 260 },
+            },
+          },
+        });
+
+        const store = useWorkflowStore.getState();
+        store.copySelectedNodes();
+        store.pasteNodes();
+
+        const state = useWorkflowStore.getState();
+        const pastedGroupIds = Object.keys(state.groups).filter((groupId) => groupId !== "group-1");
+        expect(pastedGroupIds).toHaveLength(1);
+
+        const pastedGroupId = pastedGroupIds[0];
+        expect(state.groups[pastedGroupId]).toMatchObject({
+          id: pastedGroupId,
+          name: "Group 1",
+          color: "blue",
+          position: { x: 130, y: 130 },
+          size: { width: 460, height: 260 },
+        });
+
+        const pastedNodes = state.nodes.filter((node) => node.selected);
+        expect(pastedNodes).toHaveLength(2);
+        expect(pastedNodes.every((node) => node.groupId === pastedGroupId)).toBe(true);
+        expect(pastedNodes.map((node) => node.position)).toEqual([
+          { x: 150, y: 150 },
+          { x: 350, y: 150 },
+        ]);
+      });
+    });
+
     describe("createGroup bounding box calculation", () => {
       it("should correctly calculate bounding box for easeCurve nodes (340x480)", () => {
         useWorkflowStore.setState({

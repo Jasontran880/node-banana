@@ -36,11 +36,11 @@ const GENERATION_NODE_TYPES: NodeType[] = [
   "llmGenerate",
 ];
 
-// Base 10 aspect ratios (all Gemini image models)
-const BASE_ASPECT_RATIOS: AspectRatio[] = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
+// Base 10 aspect ratios (all Gemini image models) — "auto" lets the model infer from context
+const BASE_ASPECT_RATIOS: AspectRatio[] = ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
 
 // Extended 14 aspect ratios (Nano Banana 2 adds extreme ratios)
-const EXTENDED_ASPECT_RATIOS: AspectRatio[] = ["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
+const EXTENDED_ASPECT_RATIOS: AspectRatio[] = ["auto", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
 
 // Resolutions per model
 const RESOLUTIONS_PRO: Resolution[] = ["1K", "2K", "4K"];
@@ -58,6 +58,7 @@ const LLM_PROVIDERS: { value: LLMProvider; label: string }[] = [
   { value: "google", label: "Google" },
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
+  { value: "kie", label: "Kie.ai" },
 ];
 
 const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> = {
@@ -75,6 +76,15 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
     { value: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
     { value: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
     { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
+  ],
+  kie: [
+    { value: "kie-gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    { value: "kie-gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+    { value: "kie-claude-opus-4.6", label: "Claude Opus 4.6" },
+    { value: "kie-claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "kie-claude-haiku-4.6", label: "Claude Haiku 4.6" },
+    { value: "kie-gpt-5.4", label: "GPT 5.4" },
+    { value: "kie-gpt-5.5", label: "GPT 5.5" },
   ],
 };
 
@@ -438,12 +448,12 @@ function GenerateImageControls({ node }: { node: Node }) {
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">Aspect Ratio</label>
               <select
-                value={nodeData.aspectRatio || "1:1"}
+                value={nodeData.aspectRatio || "auto"}
                 onChange={handleAspectRatioChange}
                 className="nodrag nopan w-full px-2 py-1 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 {aspectRatios.map(ar => (
-                  <option key={ar} value={ar}>{ar}</option>
+                  <option key={ar} value={ar}>{ar === "auto" ? "Auto" : ar}</option>
                 ))}
               </select>
             </div>
@@ -778,7 +788,7 @@ function LLMControls({ node }: { node: Node }) {
         provider: newProvider,
         model: firstModelForProvider,
       };
-      if (newProvider === "anthropic" && nodeData.temperature > 1) {
+      if ((newProvider === "anthropic" || newProvider === "kie") && nodeData.temperature > 1) {
         updates.temperature = 1;
       }
       updateNodeData(node.id, updates);
@@ -845,7 +855,7 @@ function LLMControls({ node }: { node: Node }) {
         <input
           type="range"
           min="0"
-          max={provider === "anthropic" ? "1" : "2"}
+          max={provider === "anthropic" || provider === "kie" ? "1" : "2"}
           step="0.01"
           value={nodeData.temperature ?? 0.7}
           onChange={handleTemperatureChange}

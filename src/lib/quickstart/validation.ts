@@ -14,6 +14,7 @@ interface ValidationResult {
 const VALID_NODE_TYPES: NodeType[] = [
   "imageInput",
   "audioInput",
+  "videoInput",
   "annotation",
   "prompt",
   "array",
@@ -35,6 +36,7 @@ const VALID_NODE_TYPES: NodeType[] = [
   "switch",
   "conditionalSwitch",
   "glbViewer",
+  "videoUpscaler",
 ];
 
 const VALID_HANDLE_TYPES = ["image", "text", "audio", "video", "easeCurve", "3d", "reference"];
@@ -43,6 +45,7 @@ const VALID_HANDLE_TYPES = ["image", "text", "audio", "video", "easeCurve", "3d"
 const DEFAULT_DIMENSIONS: Record<NodeType, { width: number; height: number }> = {
   imageInput: { width: 300, height: 280 },
   audioInput: { width: 300, height: 200 },
+  videoInput: { width: 300, height: 220 },
   annotation: { width: 300, height: 280 },
   prompt: { width: 320, height: 220 },
   array: { width: 360, height: 360 },
@@ -63,6 +66,8 @@ const DEFAULT_DIMENSIONS: Record<NodeType, { width: number; height: number }> = 
   router: { width: 200, height: 80 },
   switch: { width: 220, height: 120 },
   conditionalSwitch: { width: 260, height: 180 },
+  imageUpscaler: { width: 300, height: 300 },
+  videoUpscaler: { width: 300, height: 300 },
   glbViewer: { width: 360, height: 380 },
 };
 
@@ -228,6 +233,13 @@ function createDefaultNodeData(type: NodeType): WorkflowNodeData {
     case "audioInput":
       return {
         audioFile: null,
+        filename: null,
+        duration: null,
+        format: null,
+      };
+    case "videoInput":
+      return {
+        videoFile: null,
         filename: null,
         duration: null,
         format: null,
@@ -411,6 +423,23 @@ function createDefaultNodeData(type: NodeType): WorkflowNodeData {
             isMatched: false,
           }
         ]
+      };
+    case "imageUpscaler":
+      return {
+        inputImage: null,
+        outputImage: null,
+        upscaleFactor: "2",
+        status: "idle",
+        error: null,
+      };
+    case "videoUpscaler":
+      return {
+        inputVideo: null,
+        outputVideo: null,
+        upscaleFactor: "2",
+        selectedProvider: "kie",
+        status: "idle",
+        error: null,
       };
     case "glbViewer":
       return {

@@ -1,10 +1,13 @@
 export { ImageInputNode } from "./ImageInputNode";
 export { AudioInputNode } from "./AudioInputNode";
+export { VideoInputNode } from "./VideoInputNode";
 export { AnnotationNode } from "./AnnotationNode";
 export { PromptNode } from "./PromptNode";
 export { ArrayNode } from "./ArrayNode";
 export { PromptConstructorNode } from "./PromptConstructorNode";
 export { GenerateImageNode, NanoBananaNode } from "./GenerateImageNode";
+export { ImageUpscalerNode } from "./ImageUpscalerNode";
+export { VideoUpscalerNode } from "./VideoUpscalerNode";
 export { GenerateVideoNode } from "./GenerateVideoNode";
 export { Generate3DNode } from "./Generate3DNode";
 export { GenerateAudioNode } from "./GenerateAudioNode";

@@ -29,6 +29,27 @@ const ANTHROPIC_MODEL_MAP: Record<string, string> = {
   "claude-opus-4.6": "claude-opus-4-6",
 };
 
+// Kie.ai LLM models — Claude models use /claude/v1/messages, Gemini uses model-specific
+// OpenAI-compatible chat completion endpoints, and GPT uses /codex/v1/responses.
+const KIE_CLAUDE_MODELS = new Set(["kie-claude-opus-4.6", "kie-claude-sonnet-4.6", "kie-claude-haiku-4.6"]);
+const KIE_GEMINI_OPENAI_MODELS = new Set(["kie-gemini-3.1-pro", "kie-gemini-3.5-flash"]);
+const KIE_GPT_MODELS = new Set(["kie-gpt-5.4", "kie-gpt-5.5"]);
+
+const KIE_MODEL_ID_MAP: Record<string, string> = {
+  "kie-claude-opus-4.6": "claude-opus-4-6",
+  "kie-claude-sonnet-4.6": "claude-sonnet-4-6",
+  "kie-claude-haiku-4.6": "claude-haiku-4-6",
+  "kie-gemini-3.1-pro": "gemini-3.1-pro",
+  "kie-gemini-3.5-flash": "gemini-3.5-flash",
+  "kie-gpt-5.4": "gpt-5-4",
+  "kie-gpt-5.5": "gpt-5-5",
+};
+
+const KIE_GEMINI_OPENAI_ENDPOINT_MAP: Record<string, string> = {
+  "kie-gemini-3.1-pro": "/gemini-3.1-pro/v1/chat/completions",
+  "kie-gemini-3.5-flash": "/gemini-3-5-flash-openai/v1/chat/completions",
+};
+
 async function generateWithGoogle(
   prompt: string,
   model: LLMModelType,
@@ -289,6 +310,393 @@ async function generateWithAnthropic(
   return text;
 }
 
+const KIE_BASE = "https://api.kie.ai";
+
+async function generateWithKieClaude(
+  prompt: string,
+  model: LLMModelType,
+  temperature: number,
+  maxTokens: number,
+  images?: string[],
+  requestId?: string,
+  userApiKey?: string | null
+): Promise<string> {
+  const apiKey = userApiKey || process.env.KIE_API_KEY;
+  if (!apiKey) {
+    logger.error('api.error', 'KIE_API_KEY not configured', { requestId });
+    throw new Error("KIE_API_KEY not configured. Add it to .env.local or configure in Settings.");
+  }
+
+  const modelId = KIE_MODEL_ID_MAP[model];
+
+  logger.info('api.llm', 'Calling Kie.ai Claude API', {
+    requestId,
+    model: modelId,
+    temperature,
+    maxTokens,
+    imageCount: images?.length || 0,
+    promptLength: prompt.length,
+  });
+
+  // Build content blocks (Anthropic-style messages format)
+  const content: Array<{ type: string; text?: string; source?: { type: string; media_type: string; data: string } }> = [];
+
+  if (images && images.length > 0) {
+    for (const img of images) {
+      const matches = img.match(/^data:(.+?);base64,(.+)$/);
+      if (matches) {
+        content.push({
+          type: "image",
+          source: { type: "base64", media_type: matches[1], data: matches[2] },
+        });
+      } else {
+        content.push({
+          type: "image",
+          source: { type: "base64", media_type: "image/png", data: img },
+        });
+      }
+    }
+  }
+
+  content.push({ type: "text", text: prompt });
+
+  const startTime = Date.now();
+  const response = await fetch(`${KIE_BASE}/claude/v1/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelId,
+      messages: [{ role: "user", content }],
+      stream: false,
+      max_tokens: maxTokens,
+    }),
+  });
+  const duration = Date.now() - startTime;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logger.error('api.error', 'Kie.ai Claude API request failed', {
+      requestId,
+      status: response.status,
+      error: errorText.slice(0, 200),
+    });
+    throw new Error(`Kie.ai Claude API error: ${response.status}`);
+  }
+
+  const rawBody = await response.text();
+
+  let text: string | undefined;
+
+  // The API may return SSE stream even with stream:false — detect and parse
+  if (rawBody.startsWith("event:") || rawBody.startsWith("data:")) {
+    // Parse SSE: collect all content_block_delta text deltas
+    const chunks: string[] = [];
+    for (const line of rawBody.split("\n")) {
+      if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+      try {
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+          chunks.push(event.delta.text);
+        }
+        // Also check for message_stop with full content
+        if (event.type === "message_start" && event.message?.content?.[0]?.text) {
+          text = event.message.content[0].text;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    if (!text && chunks.length > 0) {
+      text = chunks.join("");
+    }
+  } else {
+    // Standard JSON response
+    const data = JSON.parse(rawBody);
+    text = data.content?.[0]?.text;
+  }
+
+  if (!text) {
+    logger.error('api.error', 'No text in Kie.ai Claude response', { requestId });
+    throw new Error("No text in Kie.ai Claude response");
+  }
+
+  logger.info('api.llm', 'Kie.ai Claude API response received', {
+    requestId,
+    duration,
+    responseLength: text.length,
+  });
+
+  return text;
+}
+
+type KieGeminiTextPart = {
+  text?: string;
+};
+
+type KieGeminiResponse = {
+  choices?: Array<{
+    delta?: { content?: string };
+    message?: { content?: string | KieGeminiTextPart[] };
+  }>;
+  candidates?: Array<{
+    content?: {
+      parts?: KieGeminiTextPart[];
+    };
+  }>;
+};
+
+function extractKieGeminiText(data: KieGeminiResponse): string | undefined {
+  const choice = data.choices?.[0];
+  const messageContent = choice?.message?.content;
+
+  if (typeof messageContent === "string") {
+    return messageContent;
+  }
+
+  if (Array.isArray(messageContent)) {
+    const text = messageContent
+      .map((part) => part.text)
+      .filter((part): part is string => typeof part === "string")
+      .join("");
+    if (text) {
+      return text;
+    }
+  }
+
+  if (typeof choice?.delta?.content === "string") {
+    return choice.delta.content;
+  }
+
+  const candidateText = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text)
+    .filter((part): part is string => typeof part === "string")
+    .join("");
+
+  return candidateText || undefined;
+}
+
+async function generateWithKieGeminiOpenAI(
+  prompt: string,
+  model: LLMModelType,
+  temperature: number,
+  maxTokens: number,
+  images?: string[],
+  requestId?: string,
+  userApiKey?: string | null
+): Promise<string> {
+  const apiKey = userApiKey || process.env.KIE_API_KEY;
+  if (!apiKey) {
+    logger.error('api.error', 'KIE_API_KEY not configured', { requestId });
+    throw new Error("KIE_API_KEY not configured. Add it to .env.local or configure in Settings.");
+  }
+
+  const modelId = KIE_MODEL_ID_MAP[model];
+  const endpoint = KIE_GEMINI_OPENAI_ENDPOINT_MAP[model];
+
+  logger.info('api.llm', 'Calling Kie.ai Gemini API', {
+    requestId,
+    model: modelId,
+    temperature,
+    maxTokens,
+    imageCount: images?.length || 0,
+    promptLength: prompt.length,
+  });
+
+  let content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  if (images && images.length > 0) {
+    content = [
+      { type: "text", text: prompt },
+      ...images.map((img) => ({
+        type: "image_url" as const,
+        image_url: { url: img },
+      })),
+    ];
+  } else {
+    content = prompt;
+  }
+
+  const startTime = Date.now();
+  const response = await fetch(`${KIE_BASE}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      messages: [{ role: "user", content }],
+      stream: false,
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  });
+  const duration = Date.now() - startTime;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logger.error('api.error', 'Kie.ai Gemini API request failed', {
+      requestId,
+      status: response.status,
+      error: errorText.slice(0, 200),
+    });
+    throw new Error(`Kie.ai Gemini API error: ${response.status}`);
+  }
+
+  const rawBody = await response.text();
+
+  let text: string | undefined;
+
+  // Some Kie endpoints may return SSE even when stream:false is supplied.
+  if (rawBody.startsWith("event:") || rawBody.startsWith("data:")) {
+    const chunks: string[] = [];
+    for (const line of rawBody.split("\n")) {
+      if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+      try {
+        const event = JSON.parse(line.slice(6)) as KieGeminiResponse;
+        const eventText = extractKieGeminiText(event);
+        if (eventText) {
+          chunks.push(eventText);
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    if (chunks.length > 0) {
+      text = chunks.join("");
+    }
+  } else {
+    const data = JSON.parse(rawBody) as KieGeminiResponse;
+    text = extractKieGeminiText(data);
+  }
+
+  if (!text) {
+    logger.error('api.error', 'No text in Kie.ai Gemini response', { requestId });
+    throw new Error("No text in Kie.ai Gemini response");
+  }
+
+  logger.info('api.llm', 'Kie.ai Gemini API response received', {
+    requestId,
+    duration,
+    responseLength: text.length,
+  });
+
+  return text;
+}
+
+async function generateWithKieGPT(
+  prompt: string,
+  model: LLMModelType,
+  maxTokens: number,
+  images?: string[],
+  requestId?: string,
+  userApiKey?: string | null
+): Promise<string> {
+  const apiKey = userApiKey || process.env.KIE_API_KEY;
+  if (!apiKey) {
+    logger.error('api.error', 'KIE_API_KEY not configured', { requestId });
+    throw new Error("KIE_API_KEY not configured. Add it to .env.local or configure in Settings.");
+  }
+
+  const modelId = KIE_MODEL_ID_MAP[model];
+
+  logger.info('api.llm', 'Calling Kie.ai GPT API', {
+    requestId,
+    model: modelId,
+    maxTokens,
+    imageCount: images?.length || 0,
+    promptLength: prompt.length,
+  });
+
+  // Build input content items (OpenAI Responses API format)
+  const contentItems: Array<{ type: string; text?: string; image_url?: string }> = [];
+
+  if (images && images.length > 0) {
+    for (const img of images) {
+      contentItems.push({ type: "input_image", image_url: img });
+    }
+  }
+
+  contentItems.push({ type: "input_text", text: prompt });
+
+  const input = [{ role: "user", content: contentItems }];
+
+  const startTime = Date.now();
+  const response = await fetch(`${KIE_BASE}/codex/v1/responses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelId,
+      input,
+      stream: false,
+    }),
+  });
+  const duration = Date.now() - startTime;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logger.error('api.error', 'Kie.ai GPT API request failed', {
+      requestId,
+      status: response.status,
+      error: errorText.slice(0, 200),
+    });
+    throw new Error(`Kie.ai GPT API error: ${response.status}`);
+  }
+
+  const rawBody = await response.text();
+
+  let text: string | undefined;
+
+  // The API may return SSE stream even with stream:false — detect and parse
+  if (rawBody.startsWith("event:") || rawBody.startsWith("data:")) {
+    const chunks: string[] = [];
+    for (const line of rawBody.split("\n")) {
+      if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+      try {
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "response.output_text.delta" && event.delta) {
+          chunks.push(event.delta);
+        }
+        if (event.type === "response.completed" && event.response?.output) {
+          const msgBlock = event.response.output.find((b: { type: string }) => b.type === "message");
+          const fullText = msgBlock?.content?.[0]?.text;
+          if (fullText) {
+            text = fullText;
+            break;
+          }
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    if (!text && chunks.length > 0) {
+      text = chunks.join("");
+    }
+  } else {
+    // Standard JSON response
+    const data = JSON.parse(rawBody);
+    const messageBlock = data.output?.find((block: { type: string }) => block.type === "message");
+    text = messageBlock?.content?.[0]?.text;
+  }
+
+  if (!text) {
+    logger.error('api.error', 'No text in Kie.ai GPT response', { requestId });
+    throw new Error("No text in Kie.ai GPT response");
+  }
+
+  logger.info('api.llm', 'Kie.ai GPT API response received', {
+    requestId,
+    duration,
+    responseLength: text.length,
+  });
+
+  return text;
+}
+
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
 
@@ -297,6 +705,7 @@ export async function POST(request: NextRequest) {
     const geminiApiKey = request.headers.get("X-Gemini-API-Key");
     const openaiApiKey = request.headers.get("X-OpenAI-API-Key");
     const anthropicApiKey = request.headers.get("X-Anthropic-API-Key");
+    const kieApiKey = request.headers.get("X-Kie-Key");
 
     const body: LLMGenerateRequest = await request.json();
     const {
@@ -335,6 +744,19 @@ export async function POST(request: NextRequest) {
       text = await generateWithOpenAI(prompt, model, temperature, maxTokens, images, requestId, openaiApiKey);
     } else if (provider === "anthropic") {
       text = await generateWithAnthropic(prompt, model, temperature, maxTokens, images, requestId, anthropicApiKey);
+    } else if (provider === "kie") {
+      if (KIE_CLAUDE_MODELS.has(model)) {
+        text = await generateWithKieClaude(prompt, model, temperature, maxTokens, images, requestId, kieApiKey);
+      } else if (KIE_GEMINI_OPENAI_MODELS.has(model)) {
+        text = await generateWithKieGeminiOpenAI(prompt, model, temperature, maxTokens, images, requestId, kieApiKey);
+      } else if (KIE_GPT_MODELS.has(model)) {
+        text = await generateWithKieGPT(prompt, model, maxTokens, images, requestId, kieApiKey);
+      } else {
+        return NextResponse.json<LLMGenerateResponse>(
+          { success: false, error: `Unknown Kie.ai model: ${model}` },
+          { status: 400 }
+        );
+      }
     } else {
       logger.warn('api.llm', 'Unknown provider requested', { requestId, provider });
       return NextResponse.json<LLMGenerateResponse>(

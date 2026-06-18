@@ -17,22 +17,28 @@ interface CostDialogProps {
 function ProviderIcon({ provider }: { provider: ProviderType }) {
   const colors: Record<ProviderType, { bg: string; text: string }> = {
     gemini: { bg: "bg-green-500/20", text: "text-green-300" },
+    geminiAgent: { bg: "bg-emerald-500/20", text: "text-emerald-300" },
     fal: { bg: "bg-purple-500/20", text: "text-purple-300" },
     replicate: { bg: "bg-blue-500/20", text: "text-blue-300" },
     openai: { bg: "bg-teal-500/20", text: "text-teal-300" },
     anthropic: { bg: "bg-amber-500/20", text: "text-amber-300" },
     kie: { bg: "bg-orange-500/20", text: "text-orange-300" },
     wavespeed: { bg: "bg-purple-500/20", text: "text-purple-300" },
+    muapi: { bg: "bg-cyan-500/20", text: "text-cyan-300" },
+    higgsfield: { bg: "bg-rose-500/20", text: "text-rose-300" },
   };
 
   const labels: Record<ProviderType, string> = {
     gemini: "G",
+    geminiAgent: "GA",
     fal: "f",
     replicate: "R",
     openai: "O",
     anthropic: "A",
     kie: "K",
     wavespeed: "W",
+    muapi: "M",
+    higgsfield: "H",
   };
 
   const color = colors[provider] || colors.gemini;
@@ -50,12 +56,15 @@ function ProviderIcon({ provider }: { provider: ProviderType }) {
 function getProviderDisplayName(provider: ProviderType): string {
   const names: Record<ProviderType, string> = {
     gemini: "Gemini",
+    geminiAgent: "Gemini Agent Platform",
     fal: "fal.ai",
     replicate: "Replicate",
     openai: "OpenAI",
     anthropic: "Anthropic",
     kie: "Kie.ai",
     wavespeed: "WaveSpeed",
+    muapi: "mu-api",
+    higgsfield: "Higgsfield",
   };
   return names[provider] || provider;
 }

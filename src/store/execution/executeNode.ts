@@ -19,6 +19,7 @@ import {
 } from "./simpleNodeExecutors";
 import { executeNanoBanana } from "./nanoBananaExecutor";
 import { executeGenerateVideo } from "./generateVideoExecutor";
+import { executeImageUpscaler } from "./imageUpscalerExecutor";
 import { executeGenerate3D } from "./generate3dExecutor";
 import { executeLlmGenerate } from "./llmGenerateExecutor";
 import { executeSplitGrid } from "./splitGridExecutor";
@@ -70,6 +71,9 @@ export async function executeNode(
       break;
     case "generateVideo":
       await executeGenerateVideo(ctx, regenOpts);
+      break;
+    case "imageUpscaler":
+      await executeImageUpscaler(ctx, regenOpts);
       break;
     case "generate3d":
       await executeGenerate3D(ctx, regenOpts);

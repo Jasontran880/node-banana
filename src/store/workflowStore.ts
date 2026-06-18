@@ -58,8 +58,9 @@ import {
   groupNodesByLevel,
   chunk,
   clearNodeImageRefs,
+  stripCarouselImageData,
 } from "./utils/executionUtils";
-import { getConnectedInputsPure, validateWorkflowPure } from "./utils/connectedInputs";
+import { getConnectedInputsPure, validateWorkflowPure, RunNodeOutputs } from "./utils/connectedInputs";
 import { evaluateRule } from "./utils/ruleEvaluation";
 import { computeDimmedNodes } from "./utils/dimmingUtils";
 import {
@@ -72,6 +73,8 @@ import {
   executeImageCompare,
   executeNanoBanana,
   executeGenerateVideo,
+  executeImageUpscaler,
+  executeVideoUpscaler,
   executeGenerate3D,
   executeGenerateAudio,
   executeLlmGenerate,
@@ -183,6 +186,140 @@ function buildConnectionEdgeData(
   return baseData;
 }
 
+function getGroupedMovementFromChange(
+  change: NodeChange<WorkflowNode>,
+  nodeById: Map<string, WorkflowNode>,
+  groups: Record<string, NodeGroup>,
+  fullySelectedGroupIds: Set<string>
+): { groupId: string; dx: number; dy: number; dragging?: boolean } | null {
+  let nodeId: string | null = null;
+  let nextPosition: XYPosition | undefined;
+  let dragging: boolean | undefined;
+
+  if (change.type === "position" && change.position) {
+    nodeId = change.id;
+    nextPosition = change.position;
+    dragging = change.dragging;
+  } else if (change.type === "replace") {
+    nodeId = change.id;
+    nextPosition = change.item.position;
+    dragging = change.item.dragging;
+  }
+
+  if (!nodeId || !nextPosition) return null;
+
+  const node = nodeById.get(nodeId);
+  if (!node?.groupId || !groups[node.groupId]) return null;
+  if (!fullySelectedGroupIds.has(node.groupId)) return null;
+
+  const dx = nextPosition.x - node.position.x;
+  const dy = nextPosition.y - node.position.y;
+  if (dx === 0 && dy === 0) return null;
+
+  return { groupId: node.groupId, dx, dy, dragging };
+}
+
+function getFullySelectedGroupIds(
+  changes: NodeChange<WorkflowNode>[],
+  nodes: WorkflowNode[],
+  groups: Record<string, NodeGroup>
+): Set<string> {
+  const selectedById = new Map(nodes.map((node) => [node.id, !!node.selected]));
+
+  changes.forEach((change) => {
+    if (change.type === "select") {
+      selectedById.set(change.id, change.selected);
+    } else if (change.type === "replace" && typeof change.item.selected === "boolean") {
+      selectedById.set(change.id, change.item.selected);
+    }
+  });
+
+  const groupSelection = new Map<string, { total: number; selected: number }>();
+
+  nodes.forEach((node) => {
+    if (!node.groupId || !groups[node.groupId]) return;
+
+    const stats = groupSelection.get(node.groupId) || { total: 0, selected: 0 };
+    stats.total += 1;
+    if (selectedById.get(node.id)) {
+      stats.selected += 1;
+    }
+    groupSelection.set(node.groupId, stats);
+  });
+
+  const fullySelectedGroupIds = new Set<string>();
+  groupSelection.forEach((stats, groupId) => {
+    if (stats.total > 0 && stats.selected === stats.total) {
+      fullySelectedGroupIds.add(groupId);
+    }
+  });
+
+  return fullySelectedGroupIds;
+}
+
+function applyGroupedNodeChanges(
+  changes: NodeChange<WorkflowNode>[],
+  nodes: WorkflowNode[],
+  groups: Record<string, NodeGroup>
+): { nodes: WorkflowNode[]; groups: Record<string, NodeGroup> } {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const fullySelectedGroupIds = getFullySelectedGroupIds(changes, nodes, groups);
+  const groupMovements = new Map<string, { dx: number; dy: number; dragging?: boolean }>();
+  const groupedMovementChangeIndexes = new Set<number>();
+
+  changes.forEach((change, index) => {
+    const movement = getGroupedMovementFromChange(change, nodeById, groups, fullySelectedGroupIds);
+    if (!movement) return;
+
+    if (!groupMovements.has(movement.groupId)) {
+      groupMovements.set(movement.groupId, {
+        dx: movement.dx,
+        dy: movement.dy,
+        dragging: movement.dragging,
+      });
+    }
+    groupedMovementChangeIndexes.add(index);
+  });
+
+  if (groupMovements.size === 0) {
+    return { nodes: applyNodeChanges(changes, nodes), groups };
+  }
+
+  const passThroughChanges = changes.filter((_, index) => !groupedMovementChangeIndexes.has(index));
+  const changedNodes = applyNodeChanges(passThroughChanges, nodes) as WorkflowNode[];
+  const changedGroups = { ...groups };
+
+  groupMovements.forEach((movement, groupId) => {
+    const group = changedGroups[groupId];
+    if (!group) return;
+
+    changedGroups[groupId] = {
+      ...group,
+      position: {
+        x: group.position.x + movement.dx,
+        y: group.position.y + movement.dy,
+      },
+    };
+  });
+
+  return {
+    nodes: changedNodes.map((node) => {
+      const movement = node.groupId ? groupMovements.get(node.groupId) : undefined;
+      if (!movement) return node;
+
+      return {
+        ...node,
+        position: {
+          x: node.position.x + movement.dx,
+          y: node.position.y + movement.dy,
+        },
+        ...(typeof movement.dragging === "boolean" ? { dragging: movement.dragging } : {}),
+      };
+    }) as WorkflowNode[],
+    groups: changedGroups,
+  };
+}
+
 // Workflow file format
 export interface WorkflowFile {
   version: 1;
@@ -199,6 +336,7 @@ export interface WorkflowFile {
 interface ClipboardData {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  groups?: Record<string, NodeGroup>;
 }
 
 interface WorkflowStore {
@@ -251,15 +389,17 @@ interface WorkflowStore {
 
   // Execution
   isRunning: boolean;
-  currentNodeIds: string[];  // Changed from currentNodeId for parallel execution
+  currentNodeIds: string[];  // Union of all active run node IDs
   pausedAtNodeId: string | null;
-  maxConcurrentCalls: number;  // Configurable concurrency limit (1-10)
-  _abortController: AbortController | null;  // Internal: for cancellation
+  maxConcurrentCalls: number;  // Configurable concurrency limit (1-20)
+  _abortController: AbortController | null;  // Internal: for single-node cancellation (regenerate/extend/selected)
+  activeRuns: Map<string, { currentNodeIds: string[]; abortController: AbortController }>;  // Parallel workflow runs
   _buildExecutionContext: (node: WorkflowNode, signal?: AbortSignal) => NodeExecutionContext;
   executeWorkflow: (startFromNodeId?: string) => Promise<void>;
   regenerateNode: (nodeId: string) => Promise<void>;
+  extendVideo: (nodeId: string) => Promise<void>;
   executeSelectedNodes: (nodeIds: string[]) => Promise<void>;
-  stopWorkflow: () => void;
+  stopWorkflow: (runId?: string) => void;
   setMaxConcurrentCalls: (value: number) => void;
 
   // Save/Load
@@ -269,7 +409,7 @@ interface WorkflowStore {
 
   // Helpers
   getNodeById: (id: string) => WorkflowNode | undefined;
-  getConnectedInputs: (nodeId: string) => { images: string[]; videos: string[]; audio: string[]; model3d: string | null; text: string | null; dynamicInputs: Record<string, string | string[]>; easeCurve: { bezierHandles: [number, number, number, number]; easingPreset: string | null; outputDuration: number } | null };
+  getConnectedInputs: (nodeId: string, runOutputs?: Map<string, RunNodeOutputs>) => { images: string[]; videos: string[]; audio: string[]; model3d: string | null; text: string | null; dynamicInputs: Record<string, string | string[]>; easeCurve: { bezierHandles: [number, number, number, number]; easingPreset: string | null; outputDuration: number } | null };
   validateWorkflow: () => { valid: boolean; errors: string[] };
 
   // Global Image History
@@ -450,6 +590,25 @@ function clearStaleInputImages(
   }
 }
 
+/**
+ * Clears single-node run state (regenerateNode / extendVideo / executeSelectedNodes)
+ * while preserving any in-progress parallel workflow runs in activeRuns.
+ */
+function clearLegacyRunState(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  set: (partial: any) => void,
+  get: () => WorkflowStore,
+  extra?: Record<string, unknown>
+): void {
+  const { activeRuns } = get();
+  const runs = [...activeRuns.values()];
+  set({
+    isRunning: activeRuns.size > 0,
+    currentNodeIds: [...new Set(runs.flatMap(r => r.currentNodeIds))],
+    ...extra,
+  });
+}
+
 const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   nodes: [],
   edges: [],
@@ -461,10 +620,11 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   showQuickstart: true,
   hoveredNodeId: null,
   isRunning: false,
-  currentNodeIds: [],  // Changed from currentNodeId for parallel execution
+  currentNodeIds: [],  // Union of all active run node IDs
   pausedAtNodeId: null,
-  maxConcurrentCalls: loadConcurrencySetting(),  // Default 3, configurable 1-10
-  _abortController: null,  // Internal: for cancellation
+  maxConcurrentCalls: loadConcurrencySetting(),  // Default 20, configurable 1-20
+  _abortController: null,  // Internal: for single-node cancellation
+  activeRuns: new Map(),
   globalImageHistory: [],
 
   // Auto-save initial state
@@ -610,10 +770,15 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     // Track manual changes only for remove operations (not position/selection/dimensions)
     const hasRemoveChange = changes.some((c) => c.type === "remove");
 
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes),
-      ...(hasMeaningfulChange ? { hasUnsavedChanges: true } : {}),
-    }));
+    set((state) => {
+      const groupedChanges = applyGroupedNodeChanges(changes, state.nodes, state.groups);
+
+      return {
+        nodes: groupedChanges.nodes,
+        groups: groupedChanges.groups,
+        ...(hasMeaningfulChange ? { hasUnsavedChanges: true } : {}),
+      };
+    });
 
     if (hasRemoveChange) {
       get().incrementManualChangeCount();
@@ -708,32 +873,71 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   },
 
   copySelectedNodes: () => {
-    const { nodes, edges } = get();
+    const { nodes, edges, groups } = get();
     const selectedNodes = nodes.filter((node) => node.selected);
 
     if (selectedNodes.length === 0) return;
 
     const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
 
-    // Copy edges that connect selected nodes to each other
-    const connectedEdges = edges.filter(
+    // A group is only "copied" when ALL of its member nodes are selected.
+    // Copying a subset (e.g. a single node) should paste standalone nodes, not
+    // duplicate the whole group container. This mirrors group-movement, which
+    // also only treats a group as a unit when fully selected.
+    const groupMemberCounts = new Map<string, number>();
+    nodes.forEach((node) => {
+      if (node.groupId && groups[node.groupId]) {
+        groupMemberCounts.set(node.groupId, (groupMemberCounts.get(node.groupId) ?? 0) + 1);
+      }
+    });
+    const selectedGroupCounts = new Map<string, number>();
+    selectedNodes.forEach((node) => {
+      if (node.groupId && groups[node.groupId]) {
+        selectedGroupCounts.set(node.groupId, (selectedGroupCounts.get(node.groupId) ?? 0) + 1);
+      }
+    });
+    const selectedGroupIds = new Set(
+      [...selectedGroupCounts.entries()]
+        .filter(([groupId, count]) => count === groupMemberCounts.get(groupId))
+        .map(([groupId]) => groupId)
+    );
+
+    // Edges between selected nodes (both endpoints being pasted)
+    const internalEdges = edges.filter(
       (edge) => selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
     );
 
-    // Deep clone the nodes and edges to avoid reference issues
-    const clonedNodes = JSON.parse(JSON.stringify(selectedNodes)) as WorkflowNode[];
-    const clonedEdges = JSON.parse(JSON.stringify(connectedEdges)) as WorkflowEdge[];
+    // Incoming edges from non-selected nodes (source stays, target gets a new ID on paste)
+    const externalIncomingEdges = edges.filter(
+      (edge) => !selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+    );
 
-    set({ clipboard: { nodes: clonedNodes, edges: clonedEdges } });
+    // Deep clone to avoid reference issues. Drop groupId from any node whose
+    // group is not fully selected so it pastes as a standalone node.
+    const clonedNodes = (JSON.parse(JSON.stringify(selectedNodes)) as WorkflowNode[]).map(
+      (node) =>
+        node.groupId && !selectedGroupIds.has(node.groupId)
+          ? { ...node, groupId: undefined }
+          : node
+    );
+    const clonedEdges = JSON.parse(JSON.stringify([...internalEdges, ...externalIncomingEdges])) as WorkflowEdge[];
+    const clonedGroups = selectedGroupIds.size > 0
+      ? JSON.parse(JSON.stringify(
+          Object.fromEntries([...selectedGroupIds].map((groupId) => [groupId, groups[groupId]]))
+        )) as Record<string, NodeGroup>
+      : undefined;
+
+    set({ clipboard: { nodes: clonedNodes, edges: clonedEdges, groups: clonedGroups } });
   },
 
   pasteNodes: (offset: XYPosition = { x: 50, y: 50 }) => {
-    const { clipboard, nodes, edges } = get();
+    const { clipboard, nodes, edges, groups } = get();
 
     if (!clipboard || clipboard.nodes.length === 0) return;
 
     // Create a mapping from old node IDs to new node IDs
     const idMapping = new Map<string, string>();
+    const groupIdMapping = new Map<string, string>();
 
     // Generate new IDs for all pasted nodes
     clipboard.nodes.forEach((node) => {
@@ -741,12 +945,25 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       idMapping.set(node.id, newId);
     });
 
+    const reservedGroupIds = new Set(Object.keys(groups));
+    Object.keys(clipboard.groups || {}).forEach((groupId) => {
+      let newGroupId = "";
+      do {
+        newGroupId = `group-${++groupIdCounter}`;
+      } while (reservedGroupIds.has(newGroupId));
+
+      reservedGroupIds.add(newGroupId);
+      groupIdMapping.set(groupId, newGroupId);
+    });
+
     // Create new nodes with updated IDs and offset positions
     const newNodes: WorkflowNode[] = clipboard.nodes.map((node) => {
       const defaults = defaultNodeDimensions[node.type as NodeType] || { width: 300, height: 280 };
+      const newGroupId = node.groupId ? groupIdMapping.get(node.groupId) : undefined;
       return {
         ...node,
         id: idMapping.get(node.id)!,
+        groupId: newGroupId,
         position: {
           x: node.position.x + offset.x,
           y: node.position.y + offset.y,
@@ -762,13 +979,35 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       };
     });
 
-    // Create new edges with updated source/target IDs
-    const newEdges: WorkflowEdge[] = clipboard.edges.map((edge) => ({
-      ...edge,
-      id: `edge-${idMapping.get(edge.source)}-${idMapping.get(edge.target)}-${edge.sourceHandle || "default"}-${edge.targetHandle || "default"}`,
-      source: idMapping.get(edge.source)!,
-      target: idMapping.get(edge.target)!,
-    }));
+    const newGroups = Object.fromEntries(
+      Object.entries(clipboard.groups || {}).map(([oldGroupId, group]) => {
+        const newGroupId = groupIdMapping.get(oldGroupId)!;
+        return [
+          newGroupId,
+          {
+            ...group,
+            id: newGroupId,
+            position: {
+              x: group.position.x + offset.x,
+              y: group.position.y + offset.y,
+            },
+          },
+        ];
+      })
+    ) as Record<string, NodeGroup>;
+
+    // Create new edges, handling both internal (both endpoints pasted) and
+    // external incoming (source is an existing canvas node, target is pasted).
+    const newEdges: WorkflowEdge[] = clipboard.edges.map((edge) => {
+      const newSource = idMapping.get(edge.source) ?? edge.source; // keep original if external
+      const newTarget = idMapping.get(edge.target) ?? edge.target;
+      return {
+        ...edge,
+        id: `edge-${newSource}-${newTarget}-${edge.sourceHandle || "default"}-${edge.targetHandle || "default"}`,
+        source: newSource,
+        target: newTarget,
+      };
+    });
 
     // Deselect existing nodes and add new ones
     const updatedNodes = nodes.map((node) => ({
@@ -779,6 +1018,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     set({
       nodes: [...updatedNodes, ...newNodes] as WorkflowNode[],
       edges: [...edges, ...newEdges],
+      groups: { ...groups, ...newGroups },
       hasUnsavedChanges: true,
     });
 
@@ -953,9 +1193,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     return get().nodes.find((node) => node.id === id);
   },
 
-  getConnectedInputs: (nodeId: string) => {
+  getConnectedInputs: (nodeId: string, runOutputs?: Map<string, RunNodeOutputs>) => {
     const { edges, nodes, dimmedNodeIds } = get();
-    return getConnectedInputsPure(nodeId, nodes, edges, undefined, dimmedNodeIds);
+    return getConnectedInputsPure(nodeId, nodes, edges, undefined, dimmedNodeIds, runOutputs);
   },
 
   validateWorkflow: () => {
@@ -994,23 +1234,110 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
   }),
 
   executeWorkflow: async (startFromNodeId?: string) => {
-    const { nodes, edges, groups, isRunning, maxConcurrentCalls } = get();
+    const { nodes, edges, groups, maxConcurrentCalls } = get();
 
-    if (isRunning) {
-      logger.warn('workflow.start', 'Workflow already running, ignoring execution request');
-      return;
-    }
-
-    // Create AbortController for this execution run
+    // Generate a unique ID for this run
+    const runId = crypto.randomUUID();
     const abortController = new AbortController();
     const isResuming = startFromNodeId === get().pausedAtNodeId;
-    const skippedNodeIds = new Set<string>();
-    set({ isRunning: true, pausedAtNodeId: null, currentNodeIds: [], skippedNodeIds: new Set(), _abortController: abortController });
+
+    // Per-run isolated output store: nodeId → output data produced by THIS run
+    const runOutputs = new Map<string, RunNodeOutputs>();
+
+    // Run-specific getConnectedInputs reads from runOutputs first (output isolation)
+    const runGetConnectedInputs = (nodeId: string) => {
+      const { edges: currentEdges, nodes: currentNodes, dimmedNodeIds } = get();
+      return getConnectedInputsPure(nodeId, currentNodes, currentEdges, undefined, dimmedNodeIds, runOutputs);
+    };
+
+    // Run-specific updateNodeData writes to global state (display) AND runOutputs (isolation)
+    const runUpdateNodeData = (nodeId: string, data: Partial<WorkflowNodeData>) => {
+      get().updateNodeData(nodeId, data);
+      // Extract only the output fields relevant to inter-node data passing
+      const existing = runOutputs.get(nodeId) ?? {};
+      const outputFields: RunNodeOutputs = {};
+      if ('outputImage' in data && data.outputImage !== undefined) outputFields.outputImage = data.outputImage as string | null;
+      if ('outputText' in data && data.outputText !== undefined) outputFields.outputText = data.outputText as string | null;
+      if ('outputVideo' in data && data.outputVideo !== undefined) outputFields.outputVideo = data.outputVideo as string | null;
+      if ('outputAudio' in data && data.outputAudio !== undefined) outputFields.outputAudio = data.outputAudio as string | null;
+      if ('output3dUrl' in data && data.output3dUrl !== undefined) outputFields.output3dUrl = data.output3dUrl as string | null;
+      if ('capturedImage' in data && data.capturedImage !== undefined) outputFields.capturedImage = data.capturedImage as string | null;
+      if (Object.keys(outputFields).length > 0) {
+        runOutputs.set(nodeId, { ...existing, ...outputFields });
+      }
+    };
+
+    // Build run-specific execution context
+    const buildRunContext = (node: WorkflowNode, signal?: AbortSignal): NodeExecutionContext => ({
+      node,
+      getConnectedInputs: runGetConnectedInputs,
+      updateNodeData: runUpdateNodeData,
+      getFreshNode: (id: string) => get().nodes.find((n) => n.id === id),
+      getEdges: () => get().edges,
+      getNodes: () => get().nodes,
+      signal,
+      providerSettings: get().providerSettings,
+      addIncurredCost: (cost: number) => get().addIncurredCost(cost),
+      addToGlobalHistory: (item) => get().addToGlobalHistory(item),
+      generationsPath: get().generationsPath,
+      saveDirectoryPath: get().saveDirectoryPath,
+      trackSaveGeneration: (key: string, promise: Promise<void>) => {
+        pendingImageSyncs.set(key, promise);
+        promise.finally(() => pendingImageSyncs.delete(key));
+      },
+      appendOutputGalleryImage: (targetId: string, image: string) => {
+        set((state) => ({
+          nodes: state.nodes.map((n) =>
+            n.id === targetId && n.type === "outputGallery"
+              ? { ...n, data: { ...n.data, images: [image, ...((n.data as OutputGalleryNodeData).images || [])] } as WorkflowNodeData }
+              : n
+          ) as WorkflowNode[],
+          hasUnsavedChanges: true,
+        }));
+      },
+      get: get as () => unknown,
+    });
+
+    // Register this run in activeRuns and update derived state
+    const addRun = () => {
+      const newRuns = new Map(get().activeRuns);
+      newRuns.set(runId, { currentNodeIds: [], abortController });
+      const allNodeIds = [...newRuns.values()].flatMap(r => r.currentNodeIds);
+      set({ activeRuns: newRuns, isRunning: true, pausedAtNodeId: null, currentNodeIds: [...new Set(allNodeIds)] });
+    };
+
+    // Update this run's active nodes and sync global currentNodeIds
+    const setRunCurrentNodes = (nodeIds: string[]) => {
+      const newRuns = new Map(get().activeRuns);
+      const run = newRuns.get(runId);
+      if (run) {
+        run.currentNodeIds = nodeIds;
+        newRuns.set(runId, run);
+        const allNodeIds = [...newRuns.values()].flatMap(r => r.currentNodeIds);
+        set({ activeRuns: newRuns, currentNodeIds: [...new Set(allNodeIds)] });
+      }
+    };
+
+    // Remove this run from activeRuns and sync derived state
+    const removeRun = () => {
+      const newRuns = new Map(get().activeRuns);
+      newRuns.delete(runId);
+      const runs = [...newRuns.values()];
+      const allNodeIds = runs.flatMap(r => r.currentNodeIds);
+      set({
+        activeRuns: newRuns,
+        isRunning: newRuns.size > 0 || get()._abortController !== null,
+        currentNodeIds: [...new Set(allNodeIds)],
+      });
+    };
+
+    addRun();
 
     // Start logging session
     await logger.startSession();
 
     logger.info('workflow.start', 'Workflow execution started', {
+      runId,
       nodeCount: nodes.length,
       edgeCount: edges.length,
       startFromNodeId,
@@ -1117,17 +1444,18 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         nodeType: node.type,
       });
 
-      const executionCtx = get()._buildExecutionContext(node, signal);
+      const executionCtx = buildRunContext(node, signal);
 
       switch (node.type) {
           case "imageInput":
+          case "videoInput":
             // Data source node - no execution needed
             break;
           case "audioInput": {
             // If audio is connected from upstream, use it (connection wins over upload)
-            const audioInputs = get().getConnectedInputs(node.id);
+            const audioInputs = runGetConnectedInputs(node.id);
             if (audioInputs.audio.length > 0 && audioInputs.audio[0]) {
-              get().updateNodeData(node.id, { audioFile: audioInputs.audio[0] });
+              runUpdateNodeData(node.id, { audioFile: audioInputs.audio[0] });
             }
             break;
           }
@@ -1148,6 +1476,12 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
             break;
           case "nanoBanana":
             await executeNanoBanana(executionCtx);
+            break;
+          case "imageUpscaler":
+            await executeImageUpscaler(executionCtx);
+            break;
+          case "videoUpscaler":
+            await executeVideoUpscaler(executionCtx);
             break;
           case "generateVideo":
             await executeGenerateVideo(executionCtx);
@@ -1192,7 +1526,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
             await executeSwitch(executionCtx);
             break;
           case "conditionalSwitch":
-            await evaluateAndExecuteConditionalSwitch(node, executionCtx, get().getConnectedInputs, get().updateNodeData);
+            await evaluateAndExecuteConditionalSwitch(node, executionCtx, runGetConnectedInputs, runUpdateNodeData);
             break;
         }
     }; // End of executeSingleNode helper
@@ -1201,7 +1535,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       // Execute levels sequentially, but nodes within each level in parallel
       for (let levelIdx = startLevel; levelIdx < levels.length; levelIdx++) {
         // Check if execution was stopped
-        if (abortController.signal.aborted || !get().isRunning) break;
+        if (abortController.signal.aborted) break;
 
         const level = levels[levelIdx];
         const levelNodes = level.nodeIds
@@ -1214,13 +1548,14 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         const batches = chunk(levelNodes, maxConcurrentCalls);
 
         for (const batch of batches) {
-          if (abortController.signal.aborted || !get().isRunning) break;
+          if (abortController.signal.aborted) break;
 
-          // Update currentNodeIds to show which nodes are executing
+          // Update this run's active nodes (merged into global currentNodeIds)
           const batchIds = batch.map((n) => n.id);
-          set({ currentNodeIds: batchIds });
+          setRunCurrentNodes(batchIds);
 
           logger.info('node.execution', `Executing level ${levelIdx} batch`, {
+            runId,
             level: levelIdx,
             nodeCount: batch.length,
             nodeIds: batchIds,
@@ -1238,6 +1573,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
                 !(r.reason instanceof DOMException && r.reason.name === 'AbortError')) {
               const failedNode = batch[i];
               logger.error('workflow.error', 'Node execution failed in parallel batch', {
+                runId,
                 level: levelIdx,
                 nodeId: failedNode.id,
                 nodeType: failedNode.type,
@@ -1251,8 +1587,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       }
 
       // Check if we completed or were aborted
-      if (!abortController.signal.aborted && get().isRunning) {
-        logger.info('workflow.end', 'Workflow execution completed successfully');
+      if (!abortController.signal.aborted) {
+        logger.info('workflow.end', 'Workflow execution completed successfully', { runId });
       }
 
       // Reset skipped nodes' status back to idle
@@ -1270,9 +1606,9 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     } catch (error) {
       // Handle AbortError gracefully (user cancelled)
       if (error instanceof DOMException && error.name === 'AbortError') {
-        logger.info('workflow.end', 'Workflow execution cancelled by user');
+        logger.info('workflow.end', 'Workflow execution cancelled by user', { runId });
       } else {
-        logger.error('workflow.error', 'Workflow execution failed', {}, error instanceof Error ? error : undefined);
+        logger.error('workflow.error', 'Workflow execution failed', { runId }, error instanceof Error ? error : undefined);
         // Show error toast for the failed node
         useToast.getState().show(
           `Workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -1293,17 +1629,33 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
     }
   },
 
-  stopWorkflow: () => {
-    // Abort any in-flight requests
-    const controller = get()._abortController;
-    if (controller) {
-      controller.abort("user-cancelled");
+  stopWorkflow: (runId?: string) => {
+    if (runId) {
+      // Stop a specific parallel run
+      const run = get().activeRuns.get(runId);
+      if (run) run.abortController.abort("user-cancelled");
+      const newRuns = new Map(get().activeRuns);
+      newRuns.delete(runId);
+      const runs = [...newRuns.values()];
+      set({
+        activeRuns: newRuns,
+        isRunning: newRuns.size > 0 || get()._abortController !== null,
+        currentNodeIds: [...new Set(runs.flatMap(r => r.currentNodeIds))],
+      });
+    } else {
+      // Stop all runs (workflow runs + any single-node run)
+      for (const run of get().activeRuns.values()) {
+        run.abortController.abort("user-cancelled");
+      }
+      const controller = get()._abortController;
+      if (controller) controller.abort("user-cancelled");
+      set({ activeRuns: new Map(), isRunning: false, currentNodeIds: [], _abortController: null });
     }
     set({ isRunning: false, currentNodeIds: [], skippedNodeIds: new Set(), _abortController: null });
   },
 
   setMaxConcurrentCalls: (value: number) => {
-    const clamped = Math.max(1, Math.min(10, value));
+    const clamped = Math.max(1, Math.min(30, value));
     saveConcurrencySetting(clamped);
     set({ maxConcurrentCalls: clamped });
   },
@@ -1337,6 +1689,10 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
 
       if (node.type === "nanoBanana") {
         await executeNanoBanana(executionCtx, regenOptions);
+      } else if (node.type === "imageUpscaler") {
+        await executeImageUpscaler(executionCtx, regenOptions);
+      } else if (node.type === "videoUpscaler") {
+        await executeVideoUpscaler(executionCtx, regenOptions);
       } else if (node.type === "array") {
         await executeArray(executionCtx);
       } else if (node.type === "llmGenerate") {
@@ -1351,27 +1707,27 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         await executeSplitGrid(executionCtx);
       } else if (node.type === "videoStitch") {
         await executeVideoStitch(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "easeCurve") {
         await executeEaseCurve(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "videoTrim") {
         await executeVideoTrim(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "videoFrameGrab") {
         await executeVideoFrameGrab(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       } else if (node.type === "output") {
         await executeOutput(executionCtx);
-        set({ isRunning: false, currentNodeIds: [] });
+        clearLegacyRunState(set, get);
         await logger.endSession();
         return;
       }
@@ -1401,7 +1757,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       }
 
       logger.info('node.execution', 'Node regeneration completed successfully', { nodeId });
-      set({ isRunning: false, currentNodeIds: [] });
+      clearLegacyRunState(set, get);
 
       saveLogSession();
       await logger.endSession();
@@ -1413,7 +1769,48 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
         status: "error",
         error: error instanceof Error ? error.message : "Regeneration failed",
       });
-      set({ isRunning: false, currentNodeIds: [] });
+      clearLegacyRunState(set, get);
+
+      saveLogSession();
+      await logger.endSession();
+    }
+  },
+
+  extendVideo: async (nodeId: string) => {
+    const { nodes, updateNodeData, isRunning } = get();
+
+    if (isRunning) {
+      logger.warn('node.execution', 'Cannot extend video, workflow already running', { nodeId });
+      return;
+    }
+
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      logger.warn('node.error', 'Node not found for video extension', { nodeId });
+      return;
+    }
+
+    set({ isRunning: true, currentNodeIds: [nodeId] });
+
+    await logger.startSession();
+    logger.info('node.execution', 'Extending Veo video', { nodeId });
+
+    try {
+      const executionCtx = get()._buildExecutionContext(node);
+      await executeGenerateVideo(executionCtx, { useStoredFallback: true, action: "extend" });
+
+      logger.info('node.execution', 'Video extension completed successfully', { nodeId });
+      clearLegacyRunState(set, get);
+
+      saveLogSession();
+      await logger.endSession();
+    } catch (error) {
+      logger.error('node.error', 'Video extension failed', { nodeId }, error instanceof Error ? error : undefined);
+      updateNodeData(nodeId, {
+        status: "error",
+        error: error instanceof Error ? error.message : "Video extension failed",
+      });
+      clearLegacyRunState(set, get);
 
       saveLogSession();
       await logger.endSession();
@@ -1471,6 +1868,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       switch (node.type) {
         case "imageInput":
         case "audioInput":
+        case "videoInput":
           // Data source nodes - no execution needed
           break;
         case "glbViewer":
@@ -1490,6 +1888,12 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           break;
         case "nanoBanana":
           await executeNanoBanana(executionCtx, regenOptions);
+          break;
+        case "imageUpscaler":
+          await executeImageUpscaler(executionCtx, regenOptions);
+          break;
+        case "videoUpscaler":
+          await executeVideoUpscaler(executionCtx, regenOptions);
           break;
         case "generateVideo":
           await executeGenerateVideo(executionCtx, regenOptions);
@@ -1628,7 +2032,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       }
 
       logger.info('node.execution', 'Selected nodes execution completed successfully');
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      clearLegacyRunState(set, get, { _abortController: null });
 
       saveLogSession();
       await logger.endSession();
@@ -1642,7 +2046,7 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
           "error"
         );
       }
-      set({ isRunning: false, currentNodeIds: [], _abortController: null });
+      clearLegacyRunState(set, get, { _abortController: null });
 
       saveLogSession();
       await logger.endSession();
@@ -1819,6 +2223,8 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       groups: {},
       isRunning: false,
       currentNodeIds: [],
+      activeRuns: new Map(),
+      _abortController: null,
       // Reset auto-save state when clearing workflow
       workflowId: null,
       workflowName: null,
@@ -1966,6 +2372,10 @@ const workflowStoreImpl: StateCreator<WorkflowStore> = (set, get) => ({
       if (useExternalImageStorage) {
         workflow = await externalizeWorkflowImages(workflow, saveDirectoryPath);
       }
+
+      // Strip inline base64 cache from carousel history items to prevent
+      // JSON.stringify hitting JS's max string length with many generation nodes
+      workflow = { ...workflow, nodes: stripCarouselImageData(workflow.nodes) };
 
       const response = await fetch("/api/workflow", {
         method: "POST",
@@ -2367,13 +2777,19 @@ export function useProviderApiKeys() {
   return useWorkflowStore(
     useShallow((state) => ({
       geminiApiKey: state.providerSettings.providers.gemini?.apiKey ?? null,
+      geminiAgentApiKey: state.providerSettings.providers.geminiAgent?.apiKey ?? null,
       replicateApiKey: state.providerSettings.providers.replicate?.apiKey ?? null,
       falApiKey: state.providerSettings.providers.fal?.apiKey ?? null,
       kieApiKey: state.providerSettings.providers.kie?.apiKey ?? null,
       wavespeedApiKey: state.providerSettings.providers.wavespeed?.apiKey ?? null,
+      muapiApiKey: state.providerSettings.providers.muapi?.apiKey ?? null,
+      higgsfieldApiKey: state.providerSettings.providers.higgsfield?.apiKey ?? null,
       // Provider enabled states (for conditional UI)
+      geminiAgentEnabled: state.providerSettings.providers.geminiAgent?.enabled ?? false,
       replicateEnabled: state.providerSettings.providers.replicate?.enabled ?? false,
       kieEnabled: state.providerSettings.providers.kie?.enabled ?? false,
+      muapiEnabled: state.providerSettings.providers.muapi?.enabled ?? false,
+      higgsfieldEnabled: state.providerSettings.providers.higgsfield?.enabled ?? false,
     }))
   );
 }
